@@ -31,6 +31,7 @@
 ## Current Status
 
 ### Week 4: AI/ML Model Development (Current)
+- ✅ **Modular AI Structure**: Organized AI model development with proper folder structure
 - ✅ **Stress Detection Model**: ESP32-based stress detection implementation
 - ✅ **ML Model Comparison**: Comprehensive analysis of different ML approaches
 - 🔄 **Model Optimization**: Ongoing development and testing of AI models
@@ -95,6 +96,7 @@
 - **Week 2**: [`deliverables/week2/`](deliverables/week2/) - Architecture designs
 - **Week 3**: [`deliverables/week3/`](deliverables/week3/) - Hardware documentation
 - **Week 4**: [`deliverables/week4/`](deliverables/week4/) - AI/ML models
+- **AI Models**: [`models/`](models/) - Complete AI model development structure
 
 ### Research Papers
 Comprehensive research collection in [`deliverables/researchs/`](deliverables/researchs/) covering:
