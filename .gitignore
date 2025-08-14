@@ -1,3 +1,2 @@
 .venv/
-models/data/
-shadowAI/src/data/
+data/

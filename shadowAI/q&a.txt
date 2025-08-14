@@ -1,0 +1,17 @@
+1)why to chose sampling rate as given?
+- in WESAD research they have select and they also used that
+2)why to use the 60 seconds window, 5s overlap and the things?
+-
+3)Why LOSO for Stress Detection?
+🔑 The Problem: Each person's heart rate patterns are UNIQUE!
+
+Person A: Stress = 90 BPM, Normal = 70 BPM
+Person B: Stress = 120 BPM, Normal = 100 BPM
+❌ Traditional Split: Random 80/20 split mixes all subjects
+
+Result: Model learns individual patterns, not general stress patterns
+Real-world problem: Fails on new people!
+✅ LOSO Split: Completely separate people for training/testing
+
+Result: Model learns UNIVERSAL stress patterns that work for anyone
+Real-world success: Works on completely new users!
