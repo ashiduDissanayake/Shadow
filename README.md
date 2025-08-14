@@ -71,21 +71,54 @@
 ## Development Roadmap
 
 ### Completed ✅
-- Project foundation and requirements
-- Software and hardware architecture design
-- Device compatibility analysis and documentation
-- Initial AI/ML model development
+- **Week 1**: Project foundation and requirements specification
+- **Week 2**: Software and hardware architecture design
+- **Week 3**: Device compatibility analysis and documentation
+- **Week 4**: AI/ML model development and optimization
 
-### In Progress 🔄
-- AI model optimization and testing
-- Stress detection algorithm refinement
-- Cross-platform data processing
+### Current Week 🔄
+**Week 5: Hardware Setup & Initial Data Acquisition (Days 1-3)**
+- Unbox & connect LilyGo T-Display-S3 + MAX30102
+- Set up ESP32-S3 dev environment (ESP-IDF)
+- Acquire and verify raw BVP output
 
 ### Upcoming ⏳
-- Peer-to-peer communication protocol
-- Device integration modules
-- User interface development
-- Comprehensive testing and optimization
+
+**Week 6: On-Device Preprocessing & Feature Extraction (Days 4-5)**
+- Implement causal bandpass filter in C++
+- Port simplified HRV feature extraction to ESP32-S3
+
+**Week 7: TinyML Model Integration & Inference (Days 6-9)**
+- Convert H-CNN TinyML model to int8 C array
+- Integrate TensorFlow Lite Micro in ESP32-S3 firmware
+- Feed preprocessed data into model and get predictions
+
+**Week 8: System Testing & Refinement (Days 10-14)**
+- End-to-end testing with live BVP
+- Log predictions & performance metrics
+- Identify optimizations for latency, accuracy, and battery use
+
+**Week 9: Battery Optimization & Power Profiling**
+- Measure real-world power consumption
+- Optimize sampling rate & duty cycles
+- Add low-power sleep/wake cycles
+
+**Week 10: Robustness Improvements**
+- Handle noisy/weak signals
+- Implement fallback logic when sensor contact is poor
+- Test with different skin tones & motion profiles
+
+**Week 11: Cross-Platform Data Sync**
+- Implement lightweight peer-to-peer sync between wearable and Android/Linux app
+- Secure encrypted transport
+
+**Week 12: Companion App Integration**
+- Display stress levels in real time on Android
+- Basic historical trend visualization
+
+**Week 13: Multi-Sensor Expansion**
+- Add accelerometer integration for motion-artifact reduction
+- Prepare pipeline for SpO₂ or temperature sensors
 
 ---
 
