@@ -72,53 +72,59 @@
 
 ### Completed ✅
 - **Week 1**: Project foundation and requirements specification
-- **Week 2**: Software and hardware architecture design
+- **Week 2**: Software and hardware architecture design  
 - **Week 3**: Device compatibility analysis and documentation
 - **Week 4**: AI/ML model development and optimization
 
 ### Current Week 🔄
-**Week 5: Hardware Setup & Initial Data Acquisition (Days 1-3)**
+**Week 5: Hardware Setup & Initial BVP Data Acquisition (Days 1-3)**
 - Unbox & connect LilyGo T-Display-S3 + MAX30102
 - Set up ESP32-S3 dev environment (ESP-IDF)
 - Acquire and verify raw BVP output
 
 ### Upcoming ⏳
 
-**Week 6: On-Device Preprocessing & Feature Extraction (Days 4-5)**
-- Implement causal bandpass filter in C++
+**Week 6: On-Device BVP Preprocessing & Feature Extraction (Days 4-5)**
+- Implement causal bandpass filter in C++ for BVP
 - Port simplified HRV feature extraction to ESP32-S3
 
-**Week 7: TinyML Model Integration & Inference (Days 6-9)**
-- Convert H-CNN TinyML model to int8 C array
+**Week 7: TinyML BVP Model Integration & Inference (Days 6-9)**
+- Convert H-CNN TinyML model (BVP-only) to int8 C array
 - Integrate TensorFlow Lite Micro in ESP32-S3 firmware
-- Feed preprocessed data into model and get predictions
+- Feed preprocessed BVP data into model and get predictions
 
-**Week 8: System Testing & Refinement (Days 10-14)**
-- End-to-end testing with live BVP
-- Log predictions & performance metrics
-- Identify optimizations for latency, accuracy, and battery use
+**Week 8: System Testing & Refinement (BVP-only) (Days 10-14)**
+- End-to-end testing with live BVP data
+- Log predictions & performance metrics for BVP model
+- Identify optimizations for latency, accuracy, and battery use for BVP processing
 
-**Week 9: Battery Optimization & Power Profiling**
-- Measure real-world power consumption
-- Optimize sampling rate & duty cycles
-- Add low-power sleep/wake cycles
+**Week 9: Battery Optimization, Power Profiling & Robustness Improvements**
+- Measure real-world power consumption for BVP processing
+- Optimize sampling rate & duty cycles for BVP sensor
+- Add low-power sleep/wake cycles for BVP processing
+- Handle noisy/weak BVP signals
+- Implement fallback logic when BVP sensor contact is poor
+- Test with different skin tones & motion profiles for BVP data
 
-**Week 10: Robustness Improvements**
-- Handle noisy/weak signals
-- Implement fallback logic when sensor contact is poor
-- Test with different skin tones & motion profiles
+**Week 10: Multi-Sensor Integration (ACC, GSR, MLX90614) & Model Expansion**
+- Integrate MPU9250 (Accelerometer), GSR Grove, and MLX90614ESF with LilyGo T-Display-S3
+- Develop/adapt models for ACC+BVP data fusion and combined BVP, ACC, GSR, and MLX90614 data
+- Implement on-device preprocessing and inference for multi-sensor models
 
-**Week 11: Cross-Platform Data Sync**
-- Implement lightweight peer-to-peer sync between wearable and Android/Linux app
-- Secure encrypted transport
+**Week 11: Cross-Platform Data Sync & Initial Companion App Integration**
+- Implement lightweight peer-to-peer sync between wearable and Android/Linux app for all sensor data
+- Secure encrypted transport for all data streams
+- Display stress levels and other wellness metrics in real time on Android/Linux app
 
-**Week 12: Companion App Integration**
-- Display stress levels in real time on Android
-- Basic historical trend visualization
+**Week 12: Advanced Companion App Features & Comprehensive Testing**
+- Implement basic historical trend visualization for all collected data
+- Comprehensive system testing and validation with all sensors and features
+- Identify and address any remaining bugs or performance issues
 
-**Week 13: Multi-Sensor Expansion**
-- Add accelerometer integration for motion-artifact reduction
-- Prepare pipeline for SpO₂ or temperature sensors
+**Week 13: Final Integration, Documentation & Open-Sourcing**
+- Integrate the wearable with other devices (Android phone, MacBook) for a unified ecosystem
+- Finalize all project documentation, including user guides and developer notes
+- Prepare the project for open-sourcing, including code cleanup and licensing
 
 ---
 
