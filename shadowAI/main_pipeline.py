@@ -415,6 +415,11 @@ class ShadowAIPipeline:
         
         bvp_data = self.data_loader.load_bvp_data(subjects=subjects)
         
+        # Check if we have any valid data
+        if not bvp_data:
+            self.logger.warning("No valid BVP data found for subjects, falling back to simulated data")
+            return self._demo_simulated_data()
+        
         return {
             'type': 'real',
             'dataset_info': dataset_info,
@@ -434,15 +439,40 @@ class ShadowAIPipeline:
             sample_data = data['scenarios'][0]['signals']['bvp']
             sample_labels = data['scenarios'][0]['metadata']['condition_labels']
         else:
-            # Use real data
+            # Use real data - ensure we have data to process
+            if not data['bvp_data']:
+                self.logger.error("No BVP data available for processing")
+                return {
+                    'original_signal_length': 0,
+                    'processed_segments': 0,
+                    'average_quality': 0.0,
+                    'processing_stats': {}
+                }
+            
             first_subject = list(data['bvp_data'].keys())[0]
             sample_data = data['bvp_data'][first_subject]['bvp']
             sample_labels = data['bvp_data'][first_subject]['labels']
         
-        # Process signal
+        # Process signal - ensure we have enough data
+        demo_window = 3840  # One window for demo (60 seconds at 64Hz)
+        
+        if len(sample_data) < demo_window:
+            self.logger.warning(f"Sample data too short for demo: {len(sample_data)} samples < {demo_window} required")
+            # Use all available data if less than demo window
+            demo_window = len(sample_data)
+            
+        if demo_window < 64:  # Less than 1 second
+            self.logger.error("Sample data too short for any meaningful processing")
+            return {
+                'original_signal_length': len(sample_data),
+                'processed_segments': 0,
+                'average_quality': 0.0,
+                'processing_stats': {}
+            }
+        
         processing_results = self.preprocessor.process_signal(
-            sample_data[:3840],  # One window for demo
-            sample_labels[:3840] if sample_labels is not None else None
+            sample_data[:demo_window],
+            sample_labels[:demo_window] if sample_labels is not None and len(sample_labels) >= demo_window else None
         )
         
         return {

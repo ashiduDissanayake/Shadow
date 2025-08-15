@@ -361,15 +361,10 @@ class WESADLoader:
         Returns:
             Dictionary containing dataset statistics and metadata
         """
-        # Ensure data is extracted
-        if not self._ensure_extracted():
-            return {'error': 'WESAD dataset not available'}
-        
-        subjects = self._get_available_subjects()
-        
+        # Initialize base stats structure that always includes required keys
         stats = {
-            'total_subjects': len(subjects),
-            'subject_ids': subjects,
+            'total_subjects': 0,
+            'subject_ids': [],
             'available_modalities': list(self.sampling_rates.keys()),
             'sampling_rates': self.sampling_rates,
             'condition_labels': self.labels,
@@ -381,6 +376,20 @@ class WESADLoader:
                 'meditation_duration': '8 minutes'
             }
         }
+        
+        # Try to ensure data is extracted
+        if not self._ensure_extracted():
+            stats['error'] = 'WESAD dataset not available'
+            stats['data_path'] = str(self.data_path)
+            return stats
+        
+        subjects = self._get_available_subjects()
+        
+        # Update stats with actual data
+        stats.update({
+            'total_subjects': len(subjects),
+            'subject_ids': subjects
+        })
         
         # Analyze data availability per subject
         subject_stats = []
@@ -481,7 +490,8 @@ class WESADLoader:
                 
                 # Resample labels to match BVP length (typically labels are at higher sampling rate)
                 if len(labels) > len(bvp_signal):
-                    # Calculate resampling factor
+                    # Calculate resampling factor and store original length
+                    original_label_length = len(labels)
                     resample_factor = len(labels) / len(bvp_signal)
                     # Create new indices for resampling
                     resampled_indices = np.floor(np.arange(len(bvp_signal)) * resample_factor).astype(int)
@@ -489,7 +499,7 @@ class WESADLoader:
                     resampled_indices = np.minimum(resampled_indices, len(labels) - 1)
                     # Resample labels to match BVP length
                     labels = labels[resampled_indices]
-                    logger.info(f"Resampled labels from {len(labels)*resample_factor:.0f} to {len(labels)} samples")
+                    logger.info(f"Resampled labels from {original_label_length} to {len(labels)} samples")
                 else:
                     # In rare case where BVP has more samples, truncate BVP
                     logger.warning(f"Unusual case: BVP has more samples than labels for subject {subject_id}")
