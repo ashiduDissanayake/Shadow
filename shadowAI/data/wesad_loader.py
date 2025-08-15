@@ -7,6 +7,7 @@ optimized for the ShadowAI stress detection pipeline.
 
 Features:
 - Multi-subject data loading with robust error handling
+- Automatic zip file extraction and management
 - BVP signal isolation and quality assessment
 - Multi-modal sensor data support (BVP, EDA, TEMP, ACC)
 - Data validation and consistency checks
@@ -19,11 +20,13 @@ License: MIT
 
 import os
 import pickle
+import zipfile
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Tuple, Union
 import logging
 from pathlib import Path
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -40,24 +43,36 @@ class WESADLoader:
     - Respiration signals from chest device
     
     Supports both individual and batch loading with comprehensive data validation.
+    Automatically handles zip file extraction and management.
     """
     
     def __init__(self, 
                  data_path: str = "data/raw/wesad/",
+                 zip_file_path: Optional[str] = None,
                  cache_enabled: bool = True,
-                 validate_on_load: bool = True):
+                 validate_on_load: bool = True,
+                 auto_extract: bool = True):
         """
         Initialize the WESAD dataset loader.
         
         Args:
             data_path: Path to the WESAD dataset directory containing subject folders
+            zip_file_path: Path to the WESAD.zip file. If None, looks for WESAD.zip in data_path
             cache_enabled: Whether to cache processed data for faster subsequent loads
             validate_on_load: Whether to validate data integrity during loading
+            auto_extract: Whether to automatically extract zip file if needed
         """
         self.data_path = Path(data_path)
         self.cache_enabled = cache_enabled
         self.validate_on_load = validate_on_load
+        self.auto_extract = auto_extract
         self.cache_dir = self.data_path / ".cache"
+        
+        # Determine zip file path
+        if zip_file_path is None:
+            self.zip_file_path = self.data_path / "WESAD.zip"
+        else:
+            self.zip_file_path = Path(zip_file_path)
         
         # WESAD protocol labels mapping
         self.labels = {
@@ -82,8 +97,138 @@ class WESADLoader:
         
         # Create cache directory if enabled
         if self.cache_enabled:
-            self.cache_dir.mkdir(exist_ok=True)
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Auto-extract if needed
+        if self.auto_extract:
+            self._ensure_extracted()
+    
+    def _ensure_extracted(self) -> bool:
+        """
+        Ensure the WESAD dataset is extracted and available.
+        
+        Returns:
+            True if data is available, False otherwise
+        """
+        # Check if we already have extracted data
+        subjects = self._get_available_subjects_from_directory()
+        if subjects:
+            logger.info(f"Found {len(subjects)} extracted subjects in {self.data_path}")
+            return True
+        
+        # Check if zip file exists
+        if not self.zip_file_path.exists():
+            logger.error(f"WESAD zip file not found at {self.zip_file_path}")
+            logger.info("Please download the WESAD dataset and place WESAD.zip in the data/raw/wesad/ directory")
+            return False
+        
+        # Extract the zip file
+        logger.info(f"Extracting WESAD dataset from {self.zip_file_path}")
+        return self._extract_zip_file()
+    
+    def _extract_zip_file(self) -> bool:
+        """
+        Extract the WESAD zip file to the data directory.
+        
+        Returns:
+            True if extraction successful, False otherwise
+        """
+        try:
+            # Create extraction directory
+            self.data_path.mkdir(parents=True, exist_ok=True)
             
+            with zipfile.ZipFile(self.zip_file_path, 'r') as zip_ref:
+                # Get list of files to extract
+                file_list = zip_ref.namelist()
+                
+                # Filter for relevant files (pickle files and subject directories)
+                relevant_files = [f for f in file_list if 
+                                'S' in f and ('.pkl' in f or f.endswith('/'))]
+                
+                if not relevant_files:
+                    logger.error("No relevant WESAD files found in zip archive")
+                    return False
+                
+                logger.info(f"Extracting {len(relevant_files)} files...")
+                
+                # Extract all files
+                zip_ref.extractall(self.data_path)
+                
+                # Check if extraction created a nested directory structure
+                extracted_items = list(self.data_path.iterdir())
+                
+                # If there's a single directory that contains the actual data, move it up
+                if len(extracted_items) == 1 and extracted_items[0].is_dir():
+                    nested_dir = extracted_items[0]
+                    if any(item.name.startswith('S') for item in nested_dir.iterdir()):
+                        logger.info("Moving extracted files from nested directory")
+                        for item in nested_dir.iterdir():
+                            shutil.move(str(item), str(self.data_path / item.name))
+                        nested_dir.rmdir()
+                
+                # Verify extraction
+                subjects = self._get_available_subjects_from_directory()
+                if subjects:
+                    logger.info(f"Successfully extracted data for {len(subjects)} subjects")
+                    return True
+                else:
+                    logger.error("Extraction completed but no valid subjects found")
+                    return False
+                    
+        except zipfile.BadZipFile:
+            logger.error(f"Invalid zip file: {self.zip_file_path}")
+            return False
+        except Exception as e:
+            logger.error(f"Error extracting zip file: {str(e)}")
+            return False
+    
+    def _get_available_subjects_from_directory(self) -> List[int]:
+        """Get list of available subject IDs from the dataset directory."""
+        if not self.data_path.exists():
+            return []
+        
+        subjects = []
+        for item in self.data_path.iterdir():
+            if item.is_dir() and item.name.startswith('S'):
+                try:
+                    subject_id = int(item.name[1:])
+                    # Verify that the subject has a pickle file
+                    pickle_file = item / f"S{subject_id}.pkl"
+                    if pickle_file.exists():
+                        subjects.append(subject_id)
+                except ValueError:
+                    continue
+        
+        return sorted(subjects)
+    
+    def check_dataset_status(self) -> Dict:
+        """
+        Check the current status of the WESAD dataset.
+        
+        Returns:
+            Dictionary containing status information
+        """
+        status = {
+            'zip_exists': self.zip_file_path.exists(),
+            'zip_path': str(self.zip_file_path),
+            'extracted_data_exists': False,
+            'extracted_subjects': [],
+            'data_path': str(self.data_path),
+            'ready_for_use': False
+        }
+        
+        if status['zip_exists']:
+            status['zip_size_mb'] = self.zip_file_path.stat().st_size / (1024 * 1024)
+        
+        # Check for extracted data
+        subjects = self._get_available_subjects_from_directory()
+        if subjects:
+            status['extracted_data_exists'] = True
+            status['extracted_subjects'] = subjects
+            status['ready_for_use'] = True
+        
+        return status
+    
     def load_bvp_data(self, 
                       subjects: Optional[List[int]] = None,
                       conditions: Optional[List[str]] = None,
@@ -110,6 +255,11 @@ class WESADLoader:
                 }
             }
         """
+        # Ensure data is extracted
+        if not self._ensure_extracted():
+            logger.error("Cannot load data: WESAD dataset not available")
+            return {}
+        
         logger.info("Loading BVP data from WESAD dataset")
         
         if subjects is None:
@@ -177,6 +327,11 @@ class WESADLoader:
         Returns:
             Dictionary containing all requested sensor data for each subject
         """
+        # Ensure data is extracted
+        if not self._ensure_extracted():
+            logger.error("Cannot load data: WESAD dataset not available")
+            return {}
+        
         logger.info("Loading multimodal data from WESAD dataset")
         
         if subjects is None:
@@ -206,6 +361,10 @@ class WESADLoader:
         Returns:
             Dictionary containing dataset statistics and metadata
         """
+        # Ensure data is extracted
+        if not self._ensure_extracted():
+            return {'error': 'WESAD dataset not available'}
+        
         subjects = self._get_available_subjects()
         
         stats = {
@@ -250,6 +409,12 @@ class WESADLoader:
             'subject_status': {},
             'summary': {}
         }
+        
+        # Ensure data is extracted
+        if not self._ensure_extracted():
+            validation_results['valid'] = False
+            validation_results['issues'].append("WESAD dataset not available or extractable")
+            return validation_results
         
         subjects = self._get_available_subjects()
         
@@ -310,7 +475,27 @@ class WESADLoader:
             bvp_signal = wrist_data['BVP'].flatten()
             labels = subject_data['label'].flatten()
             
-            # Filter for target conditions
+            # Fix sampling rate mismatch between BVP and labels
+            if len(bvp_signal) != len(labels):
+                logger.info(f"Sampling rate mismatch for subject {subject_id}: BVP={len(bvp_signal)}, Labels={len(labels)}")
+                
+                # Resample labels to match BVP length (typically labels are at higher sampling rate)
+                if len(labels) > len(bvp_signal):
+                    # Calculate resampling factor
+                    resample_factor = len(labels) / len(bvp_signal)
+                    # Create new indices for resampling
+                    resampled_indices = np.floor(np.arange(len(bvp_signal)) * resample_factor).astype(int)
+                    # Make sure indices are within bounds
+                    resampled_indices = np.minimum(resampled_indices, len(labels) - 1)
+                    # Resample labels to match BVP length
+                    labels = labels[resampled_indices]
+                    logger.info(f"Resampled labels from {len(labels)*resample_factor:.0f} to {len(labels)} samples")
+                else:
+                    # In rare case where BVP has more samples, truncate BVP
+                    logger.warning(f"Unusual case: BVP has more samples than labels for subject {subject_id}")
+                    bvp_signal = bvp_signal[:len(labels)]
+            
+            # Now filter for target conditions (labels and BVP are same length now)
             mask = np.isin(labels, target_labels)
             filtered_bvp = bvp_signal[mask]
             filtered_labels = labels[mask]
@@ -418,20 +603,7 @@ class WESADLoader:
     
     def _get_available_subjects(self) -> List[int]:
         """Get list of available subject IDs from the dataset directory."""
-        if not self.data_path.exists():
-            logger.warning(f"Dataset path does not exist: {self.data_path}")
-            return []
-        
-        subjects = []
-        for item in self.data_path.iterdir():
-            if item.is_dir() and item.name.startswith('S'):
-                try:
-                    subject_id = int(item.name[1:])
-                    subjects.append(subject_id)
-                except ValueError:
-                    continue
-        
-        return sorted(subjects)
+        return self._get_available_subjects_from_directory()
     
     def _analyze_subject_data(self, subject_id: int) -> Dict:
         """Analyze data availability and quality for a single subject."""

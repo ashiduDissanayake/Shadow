@@ -202,23 +202,23 @@ class BVPPreprocessor:
             'processing_info': processing_info
         }
     
-    def filter_signal(self, signal: np.ndarray) -> np.ndarray:
+    def filter_signal(self, signal_data: np.ndarray) -> np.ndarray:
         """
         Apply bandpass filtering to remove noise and artifacts.
         
         Args:
-            signal: Raw BVP signal
+            signal_data: Raw BVP signal
             
         Returns:
             Filtered signal
         """
-        if len(signal) < 3 * self.config.filter_order:
+        if len(signal_data) < 3 * self.config.filter_order:
             logger.warning("Signal too short for filtering")
-            return signal
+            return signal_data
         
         try:
-            # Apply bandpass filter
-            filtered = signal.filtfilt(self.filter_b, self.filter_a, signal)
+            # Apply bandpass filter - FIXED: Using signal module function correctly
+            filtered = signal.filtfilt(self.filter_b, self.filter_a, signal_data)
             
             # Remove DC component
             filtered = filtered - np.mean(filtered)
@@ -227,7 +227,7 @@ class BVPPreprocessor:
             
         except Exception as e:
             logger.error(f"Filtering failed: {e}")
-            return signal
+            return signal_data
     
     def remove_artifacts(self, signal: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """

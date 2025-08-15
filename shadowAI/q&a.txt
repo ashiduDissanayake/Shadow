@@ -15,3 +15,18 @@ Real-world problem: Fails on new people!
 
 Result: Model learns UNIVERSAL stress patterns that work for anyone
 Real-world success: Works on completely new users!
+
+4)why you used this Butterworth bandpass filter?
+Filter Type	Pros	Cons	Why Not Used
+Chebyshev	Sharp cutoff	Ripple in passband	Ripple distorts BVP morphology
+Elliptic	Sharpest cutoff	Ripple in both bands	Complex, overkill for BVP
+Moving Average	Simple	Poor frequency response	Doesn't handle non-stationary noise
+Butterworth	Flat passband	Gentle rolloff	Best for BVP
+
+The Butterworth bandpass filter was chosen because it provides the optimal balance of:
+✅ Signal preservation (flat passband)
+✅ Noise rejection (effective cutoff)
+✅ Computational efficiency (simple implementation)
+✅ Clinical validation (proven effectiveness)
+✅ Real-time capability (suitable for wearables)
+

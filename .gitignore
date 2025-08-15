@@ -1,2 +1,7 @@
 .venv/
 data/
+logs/
+*.pyc
+__pycache__/
+*.pyo
+results/
