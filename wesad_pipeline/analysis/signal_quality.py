@@ -1,14 +1,12 @@
 """
 Signal Quality Assessment Module
 
-Provides comprehensive signal quality assessment for BVP signals including
-variance analysis, peak consistency, and sliding window quality assessment.
+Provides comprehensive signal quality assessment for individual BVP signals.
 
 Features:
-- Signal quality computation based on variance and peak consistency
-- Sliding window quality assessment
+- Multi-metric quality assessment (variance, periodicity, morphology, amplitude, noise)
 - Quality threshold validation
-- Real-time quality monitoring capabilities
+- Statistical tracking and reporting
 
 Author: Shadow AI Team
 License: MIT
@@ -16,7 +14,7 @@ License: MIT
 
 import numpy as np
 import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict
 from scipy import signal
 from scipy.stats import pearsonr
 import warnings
@@ -27,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class SignalQuality:
     """
-    Signal quality analyzer for BVP signals.
+    Signal quality analyzer for individual BVP signals.
     
     Provides comprehensive quality assessment using multiple metrics including
     signal variance, peak consistency, periodicity, and morphological features.
@@ -45,7 +43,6 @@ class SignalQuality:
         
         # Quality assessment parameters
         self.sampling_rate = config.dataset.bvp_sampling_rate
-        self.window_size = config.analysis.window_size_seconds * self.sampling_rate
         
         # Heart rate constraints for quality assessment
         self.min_hr = config.analysis.min_heart_rate
@@ -54,7 +51,6 @@ class SignalQuality:
         # Statistics tracking
         self.stats = {
             'assessments_performed': 0,
-            'segments_assessed': 0,
             'avg_quality_score': 0.0,
             'quality_distribution': {'excellent': 0, 'good': 0, 'fair': 0, 'poor': 0}
         }
@@ -128,64 +124,22 @@ class SignalQuality:
             self.logger.error(f"Quality assessment failed: {str(e)}")
             return self._empty_quality_result()
     
-    def assess_windowed_quality(self, bvp_signal: np.ndarray, window_length: Optional[int] = None) -> Dict:
+    def validate_quality_threshold(self, bvp_signal: np.ndarray, threshold: float = None) -> bool:
         """
-        Assess signal quality using sliding windows.
+        Validate if signal meets quality threshold.
         
         Args:
             bvp_signal: BVP signal array
-            window_length: Window length in samples. If None, uses config window size.
+            threshold: Quality threshold (0-1). Uses config default if None.
             
         Returns:
-            Dictionary containing windowed quality assessment
+            True if signal quality meets threshold
         """
-        if window_length is None:
-            window_length = int(self.window_size)
+        if threshold is None:
+            threshold = self.config.analysis.quality_threshold
         
-        if len(bvp_signal) < window_length:
-            self.logger.warning(f"Signal too short for windowed analysis: {len(bvp_signal)} < {window_length}")
-            return {
-                'window_scores': [],
-                'window_positions': [],
-                'avg_quality': 0.0,
-                'min_quality': 0.0,
-                'max_quality': 0.0,
-                'quality_std': 0.0
-            }
-        
-        overlap = int(self.config.analysis.overlap_seconds * self.sampling_rate)
-        step_size = window_length - overlap
-        
-        window_scores = []
-        window_positions = []
-        
-        # Slide window through signal
-        for start_idx in range(0, len(bvp_signal) - window_length + 1, step_size):
-            end_idx = start_idx + window_length
-            window_signal = bvp_signal[start_idx:end_idx]
-            
-            # Assess quality for this window
-            quality_result = self.assess_signal_quality(window_signal)
-            window_scores.append(quality_result['overall_score'])
-            window_positions.append((start_idx, end_idx))
-            
-            self.stats['segments_assessed'] += 1
-        
-        # Calculate windowed statistics
-        window_scores = np.array(window_scores)
-        windowed_result = {
-            'window_scores': window_scores.tolist(),
-            'window_positions': window_positions,
-            'avg_quality': float(np.mean(window_scores)) if len(window_scores) > 0 else 0.0,
-            'min_quality': float(np.min(window_scores)) if len(window_scores) > 0 else 0.0,
-            'max_quality': float(np.max(window_scores)) if len(window_scores) > 0 else 0.0,
-            'quality_std': float(np.std(window_scores)) if len(window_scores) > 0 else 0.0,
-            'window_length': window_length,
-            'step_size': step_size,
-            'total_windows': len(window_scores)
-        }
-        
-        return windowed_result
+        quality_result = self.assess_signal_quality(bvp_signal)
+        return quality_result['overall_score'] >= threshold
     
     def _assess_variance_quality(self, bvp_signal: np.ndarray) -> float:
         """Assess signal quality based on variance."""
@@ -252,13 +206,15 @@ class SignalQuality:
                 
                 # Cross-correlation with the template
                 correlation = np.correlate(bvp_signal, template, mode='valid')
-                max_correlation = np.max(correlation) / (np.linalg.norm(template) * np.linalg.norm(bvp_signal))
-                regularity_score = np.clip(max_correlation, 0.0, 1.0)
+                if len(correlation) > 0:
+                    template_consistency = np.max(correlation) / (np.linalg.norm(template) * np.linalg.norm(bvp_signal))
+                else:
+                    template_consistency = 0.0
             else:
-                regularity_score = 0.0
+                template_consistency = 0.0
             
-            # Combine gradient smoothness and regularity
-            morphology_score = 0.6 * gradient_smoothness + 0.4 * regularity_score
+            # Combine smoothness and consistency
+            morphology_score = 0.5 * gradient_smoothness + 0.5 * template_consistency
             
             return np.clip(morphology_score, 0.0, 1.0)
             
@@ -311,26 +267,26 @@ class SignalQuality:
         except Exception:
             return 0.0
     
-    def _categorize_quality(self, quality_score: float) -> str:
+    def _categorize_quality(self, overall_score: float) -> str:
         """Categorize quality score into levels."""
-        if quality_score >= 0.8:
+        if overall_score >= 0.8:
             return 'excellent'
-        elif quality_score >= 0.6:
+        elif overall_score >= 0.6:
             return 'good'
-        elif quality_score >= 0.4:
+        elif overall_score >= 0.4:
             return 'fair'
         else:
             return 'poor'
     
-    def _update_quality_distribution(self, quality_score: float) -> None:
+    def _update_quality_distribution(self, overall_score: float):
         """Update quality distribution statistics."""
-        category = self._categorize_quality(quality_score)
-        self.stats['quality_distribution'][category] += 1
+        quality_level = self._categorize_quality(overall_score)
+        self.stats['quality_distribution'][quality_level] += 1
         
-        # Update average quality score
+        # Update average
         total_assessments = self.stats['assessments_performed']
         current_avg = self.stats['avg_quality_score']
-        self.stats['avg_quality_score'] = ((current_avg * (total_assessments - 1)) + quality_score) / total_assessments
+        self.stats['avg_quality_score'] = ((current_avg * (total_assessments - 1)) + overall_score) / total_assessments
     
     def _empty_quality_result(self) -> Dict:
         """Return empty quality result for error cases."""
@@ -343,39 +299,20 @@ class SignalQuality:
                 'amplitude_score': 0.0,
                 'noise_score': 0.0
             },
-            'weights': {},
+            'weights': {'variance': 0.2, 'periodicity': 0.3, 'morphology': 0.2, 'amplitude': 0.15, 'noise': 0.15},
             'quality_level': 'poor',
             'signal_length': 0,
             'sampling_rate': self.sampling_rate
         }
     
-    def validate_quality_threshold(self, bvp_signal: np.ndarray, threshold: Optional[float] = None) -> bool:
-        """
-        Validate if signal meets quality threshold.
-        
-        Args:
-            bvp_signal: BVP signal array
-            threshold: Quality threshold. If None, uses config threshold.
-            
-        Returns:
-            True if signal meets quality threshold, False otherwise
-        """
-        if threshold is None:
-            threshold = self.config.analysis.quality_threshold
-        
-        quality_result = self.assess_signal_quality(bvp_signal)
-        return quality_result['overall_score'] >= threshold
-    
-    def get_quality_statistics(self) -> Dict:
+    def get_quality_stats(self) -> Dict:
         """Get quality assessment statistics."""
         return self.stats.copy()
     
-    def reset_statistics(self) -> None:
+    def reset_stats(self):
         """Reset quality assessment statistics."""
         self.stats = {
             'assessments_performed': 0,
-            'segments_assessed': 0,
             'avg_quality_score': 0.0,
             'quality_distribution': {'excellent': 0, 'good': 0, 'fair': 0, 'poor': 0}
         }
-        self.logger.debug("Quality assessment statistics reset")
