@@ -123,9 +123,10 @@ class WESADPreprocessor:
                 bvp_clean = np.interp(np.arange(len(bvp_clean)), valid_indices, bvp_clean[valid_indices])
                 self.stats['nan_values_fixed'] += np.sum(nan_mask)
             else:
-                # If too many NaN values, fill with median
-                median_val = np.nanmedian(bvp_clean)
-                bvp_clean[nan_mask] = median_val
+                # If all or most values are NaN, use a default value instead of median
+                default_val = 0.0 if len(valid_indices) == 0 else np.mean(bvp_clean[valid_indices])
+                bvp_clean[nan_mask] = default_val
+                self.stats['nan_values_fixed'] += np.sum(nan_mask)
                 
         # Handle infinite values
         inf_mask = np.isinf(bvp_clean)
@@ -183,6 +184,10 @@ class WESADPreprocessor:
             Dictionary with processed data
         """
         try:
+            # Validate input data exists
+            if not subject_data:
+                raise ValueError("Subject data dictionary is empty")
+                
             # Extract data (assuming already resampled)
             bvp = subject_data.get('bvp', np.array([]))
             labels = subject_data.get('labels', np.array([]))
