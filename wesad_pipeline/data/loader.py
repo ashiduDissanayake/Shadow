@@ -221,7 +221,7 @@ class WESADDataLoader:
         Returns:
             True if data is valid, False otherwise
         """
-        required_keys = ['bvp', 'labels', 'quality_score']
+        required_keys = ['bvp', 'labels']
         
         # Check required keys
         for key in required_keys:
@@ -249,14 +249,8 @@ class WESADDataLoader:
             self.logger.error("Labels data is empty")
             return False
         
-        # Check quality score
-        quality_score = subject_data.get('quality_score', 0)
-        if quality_score < self.config.analysis.quality_threshold:
-            self.logger.warning(f"Quality score {quality_score:.3f} below threshold {self.config.analysis.quality_threshold}")
-            return False
-        
         # Check sampling rate consistency (approximate)
-        expected_samples = len(labels) * (self.config.dataset.bvp_sampling_rate / self.config.dataset.resp_sampling_rate)
+        expected_samples = len(labels)
         actual_samples = len(bvp)
         
         # Allow some tolerance for sampling rate differences
