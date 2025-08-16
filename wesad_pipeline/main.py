@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from wesad_pipeline.config import WESADConfig
 from wesad_pipeline.data import WESADDataLoader, WESADPreprocessor
-from wesad_pipeline.analysis import SignalQuality, HeartRateAnalyzer, WindowAnalyzer
+from wesad_pipeline.analysis import SignalQuality, WindowQuality, HeartRateAnalyzer, WindowAnalyzer
 from wesad_pipeline.visualization import SignalPlotter, WindowPlotter, DatasetPlotter
 from wesad_pipeline.utils import WESADHelpers, DocumentationGenerator
 
@@ -86,6 +86,7 @@ class WESADPipeline:
         self.data_loader = WESADDataLoader(config)
         self.preprocessor = WESADPreprocessor(config)
         self.signal_quality = SignalQuality(config)
+        self.window_quality = WindowQuality(config)
         self.heart_rate_analyzer = HeartRateAnalyzer(config)
         self.window_analyzer = WindowAnalyzer(config)
         self.signal_plotter = SignalPlotter(config)
@@ -246,7 +247,7 @@ class WESADPipeline:
     
     def run_signal_analysis(self, dataset_results: Dict[int, Dict]) -> Dict[int, Dict]:
         """
-        Run signal quality assessment and heart rate analysis.
+        Run signal quality assessment and heart rate analysis with quality gating.
         
         Args:
             dataset_results: Results from data processing
@@ -269,12 +270,24 @@ class WESADPipeline:
                     continue
                 
                 try:
-                    # Signal quality assessment
+                    # Step 1: Single Signal Quality Assessment
+                    quality_result = None
                     if self.config.analysis.enable_quality_assessment:
                         quality_result = self.signal_quality.assess_signal_quality(bvp_signal)
                         results['signal_quality_result'] = quality_result
+                        
+                        # Quality gating: check if signal meets threshold
+                        quality_threshold = self.config.analysis.quality_threshold
+                        signal_passes_quality = quality_result['overall_score'] >= quality_threshold
+                        results['signal_passes_quality'] = signal_passes_quality
+                        
+                        if not signal_passes_quality:
+                            self.logger.warning(f"Subject {subject_id} signal quality below threshold "
+                                              f"({quality_result['overall_score']:.3f} < {quality_threshold:.3f})")
+                            # Mark as quality failed but continue with heart rate analysis
+                            results['quality_gating_failed'] = True
                     
-                    # Heart rate analysis
+                    # Heart rate analysis (can run regardless of quality)
                     heart_rate_result = self.heart_rate_analyzer.estimate_heart_rate(bvp_signal)
                     results['heart_rate_result'] = heart_rate_result
                     
@@ -291,7 +304,7 @@ class WESADPipeline:
     
     def run_windowing_analysis(self, dataset_results: Dict[int, Dict]) -> Dict[int, Dict]:
         """
-        Run windowing analysis and feature extraction.
+        Run windowing analysis and feature extraction with new 3-step architecture.
         
         Args:
             dataset_results: Results from signal analysis
@@ -306,6 +319,11 @@ class WESADPipeline:
                 if 'processed_data' not in results:
                     continue
                 
+                # Check quality gating from signal analysis
+                if results.get('quality_gating_failed', False):
+                    self.logger.info(f"Skipping windowing for subject {subject_id} due to poor signal quality")
+                    continue
+                
                 processed_data = results['processed_data']
                 bvp_signal = processed_data.get('bvp', np.array([]))
                 labels = processed_data.get('labels', np.array([]))
@@ -316,20 +334,49 @@ class WESADPipeline:
                     continue
                 
                 try:
-                    # Create windows
+                    # Step 2: Window Creation (pure windowing, no quality assessment)
                     windowing_result = self.window_analyzer.create_windows(
                         bvp_signal, labels, timestamps
                     )
                     results['windowing_result'] = windowing_result
                     
+                    # Step 3: Window Quality Assessment
+                    if windowing_result['windows']:
+                        # Assess quality for each window
+                        windows_with_quality, quality_filter_stats = self.window_quality.filter_windows_by_quality(
+                            windowing_result['windows']
+                        )
+                        
+                        # Update windowing result with quality-filtered windows
+                        windowing_result['quality_filtered_windows'] = windows_with_quality
+                        windowing_result['quality_filter_stats'] = quality_filter_stats
+                        
+                        # Also perform windowed quality analysis on the original signal
+                        windowed_quality_result = self.window_quality.assess_windowed_quality(bvp_signal)
+                        results['windowed_quality_result'] = windowed_quality_result
+                        
+                        # Analyze quality distribution
+                        quality_distribution = self.window_quality.analyze_quality_distribution(windows_with_quality)
+                        results['window_quality_distribution'] = quality_distribution
+                        
+                        self.logger.info(f"Subject {subject_id}: {len(windows_with_quality)}/{len(windowing_result['windows'])} "
+                                       f"windows passed quality filtering")
+                    
                     # Update statistics
                     metadata = windowing_result.get('metadata', {})
-                    self.pipeline_stats['total_windows'] += metadata.get('accepted_windows', 0)
+                    quality_stats = windowing_result.get('quality_filter_stats', {})
+                    self.pipeline_stats['total_windows'] += metadata.get('total_windows', 0)
                     
-                    # Extract features if requested
-                    if self.config.analysis.enable_time_domain or self.config.analysis.enable_frequency_domain:
-                        features_result = self.window_analyzer.extract_window_features(windowing_result)
-                        results['features_result'] = features_result
+                    # Extract features if requested (use quality-filtered windows)
+                    if (self.config.analysis.enable_time_domain or self.config.analysis.enable_frequency_domain):
+                        feature_windows = windowing_result.get('quality_filtered_windows', windowing_result['windows'])
+                        if feature_windows:
+                            # Create a modified windowing result for feature extraction
+                            modified_windowing_result = windowing_result.copy()
+                            modified_windowing_result['windows'] = feature_windows
+                            
+                            features_result = self.window_analyzer.extract_window_features(modified_windowing_result)
+                            results['features_result'] = features_result
                     
                 except Exception as e:
                     self.logger.error(f"Windowing analysis failed for subject {subject_id}: {str(e)}")
@@ -482,8 +529,9 @@ class WESADPipeline:
         
         stats['component_statistics'] = {
             'data_loader': self.data_loader.get_dataset_statistics(),
-            'preprocessor': self.preprocessor.get_processing_statistics(),
+            'preprocessor': self.preprocessor.get_processing_stats(),
             'signal_quality': self.signal_quality.get_quality_statistics(),
+            'window_quality': self.window_quality.get_window_quality_statistics(),
             'heart_rate_analyzer': self.heart_rate_analyzer.get_hr_statistics(),
             'window_analyzer': self.window_analyzer.get_windowing_statistics()
         }

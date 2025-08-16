@@ -47,7 +47,6 @@ class WindowAnalyzer:
         self.window_size = config.analysis.window_size_seconds * config.dataset.bvp_sampling_rate
         self.overlap = config.analysis.overlap_seconds * config.dataset.bvp_sampling_rate
         self.step_size = int(self.window_size - self.overlap)
-        self.min_quality = config.analysis.min_window_quality
         
         # Analysis parameters
         self.sampling_rate = config.dataset.bvp_sampling_rate
@@ -124,18 +123,11 @@ class WindowAnalyzer:
                 # Calculate window label and confidence
                 window_label, label_confidence = self._calculate_window_label(window_labels_raw)
                 
-                # Calculate window quality
-                if quality_scores is not None:
-                    window_quality = np.mean(quality_scores[start_idx:end_idx])
-                else:
-                    window_quality = self._estimate_window_quality(window_bvp)
-                
-                # Store window data
+                # Store window data (no quality assessment here)
                 window_data = {
                     'bvp': window_bvp,
                     'label': window_label,
                     'confidence': label_confidence,
-                    'quality': window_quality,
                     'start_idx': start_idx,
                     'end_idx': end_idx,
                     'start_time': window_ts[0],
@@ -143,29 +135,32 @@ class WindowAnalyzer:
                     'window_id': len(windows_data)
                 }
                 
+                # Add quality if provided as input
+                if quality_scores is not None:
+                    window_data['quality'] = np.mean(quality_scores[start_idx:end_idx])
+                
                 windows_data.append(window_data)
                 window_positions.append((start_idx, end_idx))
                 window_labels.append(window_label)
                 window_confidences.append(label_confidence)
-                window_qualities.append(window_quality)
+                if quality_scores is not None:
+                    window_qualities.append(window_data['quality'])
                 window_timestamps.append((window_ts[0], window_ts[-1]))
                 
                 self.stats['windows_created'] += 1
             
-            # Filter windows based on quality threshold
-            accepted_windows = []
+            # No quality-based filtering in windowing - that's handled by WindowQuality
+            accepted_windows = windows_data  # All windows are accepted at this stage
+            
+            # Update statistics for all windows
             for window_data in windows_data:
-                if window_data['quality'] >= self.min_quality:
-                    accepted_windows.append(window_data)
-                    self.stats['windows_accepted'] += 1
-                    
-                    # Update label distribution
-                    label_name = self.config.get_label_name(window_data['label'])
-                    if label_name not in self.stats['label_distribution']:
-                        self.stats['label_distribution'][label_name] = 0
-                    self.stats['label_distribution'][label_name] += 1
-                else:
-                    self.stats['windows_rejected'] += 1
+                self.stats['windows_accepted'] += 1
+                
+                # Update label distribution
+                label_name = self.config.get_label_name(window_data['label'])
+                if label_name not in self.stats['label_distribution']:
+                    self.stats['label_distribution'][label_name] = 0
+                self.stats['label_distribution'][label_name] += 1
             
             # Calculate summary statistics
             summary_stats = self._calculate_window_statistics(accepted_windows)
@@ -184,14 +179,14 @@ class WindowAnalyzer:
                 'window_positions': window_positions,
                 'window_labels': np.array(window_labels),
                 'window_confidences': np.array(window_confidences),
-                'window_qualities': np.array(window_qualities),
+                'window_qualities': np.array(window_qualities) if window_qualities else np.array([]),
                 'window_timestamps': window_timestamps,
                 'summary_stats': summary_stats,
                 'metadata': {
                     'total_windows': len(windows_data),
                     'accepted_windows': len(accepted_windows),
-                    'rejected_windows': len(windows_data) - len(accepted_windows),
-                    'acceptance_rate': len(accepted_windows) / max(len(windows_data), 1),
+                    'rejected_windows': 0,  # No rejection at windowing stage
+                    'acceptance_rate': 1.0,  # All windows accepted at windowing stage
                     'window_size_samples': int(self.window_size),
                     'window_size_seconds': self.config.analysis.window_size_seconds,
                     'overlap_samples': int(self.overlap),
@@ -202,8 +197,7 @@ class WindowAnalyzer:
                 }
             }
             
-            self.logger.info(f"Created {len(accepted_windows)}/{len(windows_data)} windows "
-                           f"(acceptance rate: {result['metadata']['acceptance_rate']:.2%})")
+            self.logger.info(f"Created {len(accepted_windows)} windows from signal")
             
             return result
             
@@ -229,7 +223,10 @@ class WindowAnalyzer:
             # Extract labels and confidences
             labels = [w['label'] for w in windows]
             confidences = [w['confidence'] for w in windows]
-            qualities = [w['quality'] for w in windows]
+            
+            # Check if quality information is available
+            has_quality = len(windows) > 0 and 'quality' in windows[0]
+            qualities = [w['quality'] for w in windows] if has_quality else []
             
             # Count distribution by condition
             label_counts = Counter(labels)
@@ -243,7 +240,8 @@ class WindowAnalyzer:
                 
                 # Calculate average quality and confidence for this condition
                 condition_windows = [w for w in windows if w['label'] == label_id]
-                condition_qualities[condition_name] = np.mean([w['quality'] for w in condition_windows])
+                if has_quality:
+                    condition_qualities[condition_name] = np.mean([w['quality'] for w in condition_windows])
                 condition_confidences[condition_name] = np.mean([w['confidence'] for w in condition_windows])
             
             # Calculate temporal distribution
@@ -253,19 +251,12 @@ class WindowAnalyzer:
             distribution_analysis = {
                 'condition_counts': condition_counts,
                 'condition_percentages': {k: v/len(windows)*100 for k, v in condition_counts.items()},
-                'condition_qualities': condition_qualities,
                 'condition_confidences': condition_confidences,
                 'temporal_info': {
                     'total_windows': len(windows),
                     'total_duration': total_duration,
                     'average_window_duration': self.config.analysis.window_size_seconds,
                     'coverage_ratio': len(windows) * self.config.analysis.window_size_seconds / total_duration
-                },
-                'quality_stats': {
-                    'mean_quality': np.mean(qualities),
-                    'std_quality': np.std(qualities),
-                    'min_quality': np.min(qualities),
-                    'max_quality': np.max(qualities)
                 },
                 'confidence_stats': {
                     'mean_confidence': np.mean(confidences),
@@ -274,6 +265,16 @@ class WindowAnalyzer:
                     'max_confidence': np.max(confidences)
                 }
             }
+            
+            # Add quality info only if available
+            if has_quality:
+                distribution_analysis['condition_qualities'] = condition_qualities
+                distribution_analysis['quality_stats'] = {
+                    'mean_quality': np.mean(qualities),
+                    'std_quality': np.std(qualities),
+                    'min_quality': np.min(qualities),
+                    'max_quality': np.max(qualities)
+                }
             
             return distribution_analysis
             
@@ -314,9 +315,12 @@ class WindowAnalyzer:
                 window_features = {
                     **time_features,
                     **freq_features,
-                    'quality': window['quality'],
                     'confidence': window['confidence']
                 }
+                
+                # Add quality only if available
+                if 'quality' in window:
+                    window_features['quality'] = window['quality']
                 
                 features_list.append(window_features)
                 labels_list.append(window['label'])
@@ -358,33 +362,7 @@ class WindowAnalyzer:
         
         return int(window_label), float(confidence)
     
-    def _estimate_window_quality(self, window_bvp: np.ndarray) -> float:
-        """Estimate quality score for a BVP window."""
-        if len(window_bvp) == 0:
-            return 0.0
-        
-        try:
-            # Simple quality estimation based on signal characteristics
-            # This is a simplified version - in practice, use the SignalQuality class
-            
-            # Signal variance (normalized)
-            signal_var = np.var(window_bvp)
-            signal_mean = np.mean(np.abs(window_bvp))
-            var_score = min(1.0, signal_var / (signal_mean + 1e-8))
-            
-            # Signal smoothness
-            if len(window_bvp) > 1:
-                gradient = np.gradient(window_bvp)
-                smoothness_score = 1.0 / (1.0 + np.std(gradient))
-            else:
-                smoothness_score = 0.0
-            
-            # Combined quality score
-            quality_score = 0.6 * var_score + 0.4 * smoothness_score
-            return np.clip(quality_score, 0.0, 1.0)
-            
-        except Exception:
-            return 0.0
+
     
     def _extract_time_domain_features(self, bvp_window: np.ndarray) -> Dict:
         """Extract time domain features from BVP window."""
@@ -486,7 +464,9 @@ class WindowAnalyzer:
         if not windows:
             return {}
         
-        qualities = [w['quality'] for w in windows]
+        # Only include quality stats if windows have quality information
+        has_quality = len(windows) > 0 and 'quality' in windows[0]
+        
         confidences = [w['confidence'] for w in windows]
         labels = [w['label'] for w in windows]
         
@@ -499,13 +479,19 @@ class WindowAnalyzer:
         
         stats = {
             'total_windows': len(windows),
-            'avg_quality': np.mean(qualities),
-            'std_quality': np.std(qualities),
             'avg_confidence': np.mean(confidences),
             'std_confidence': np.std(confidences),
             'condition_distribution': condition_dist,
             'unique_conditions': len(set(labels))
         }
+        
+        # Add quality stats only if available
+        if has_quality:
+            qualities = [w['quality'] for w in windows]
+            stats.update({
+                'avg_quality': np.mean(qualities),
+                'std_quality': np.std(qualities),
+            })
         
         return stats
     

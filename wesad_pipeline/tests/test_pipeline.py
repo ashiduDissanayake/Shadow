@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from wesad_pipeline.config import WESADConfig
 from wesad_pipeline.data import WESADPreprocessor
-from wesad_pipeline.analysis import SignalQuality, HeartRateAnalyzer, WindowAnalyzer
+from wesad_pipeline.analysis import SignalQuality, WindowQuality, HeartRateAnalyzer, WindowAnalyzer
 from wesad_pipeline.utils import WESADHelpers
 from wesad_pipeline.main import WESADPipeline
 
@@ -128,6 +128,77 @@ class TestWESADPreprocessor(unittest.TestCase):
         self.assertLess(np.max(cleaned_signal), np.max(signal))
 
 
+class TestWindowQuality(unittest.TestCase):
+    """Test window quality assessment module."""
+    
+    def setUp(self):
+        """Set up test fixtures."""
+        self.config = WESADConfig()
+        self.window_quality = WindowQuality(self.config)
+    
+    def test_windowed_quality_assessment(self):
+        """Test windowed quality assessment."""
+        # Create test signal
+        bvp_signal = np.random.randn(2000)  # ~31 seconds at 64Hz
+        
+        windowed_result = self.window_quality.assess_windowed_quality(bvp_signal, window_length=640)
+        
+        # Check result structure
+        self.assertIn('window_scores', windowed_result)
+        self.assertIn('avg_quality', windowed_result)
+        
+        # Should have multiple windows
+        self.assertGreater(len(windowed_result['window_scores']), 1)
+    
+    def test_window_quality_filtering(self):
+        """Test window quality filtering."""
+        # Create test windows data
+        windows_data = []
+        for i in range(5):
+            window = {
+                'bvp': np.random.randn(640),  # Random BVP data
+                'label': 1,
+                'confidence': 0.8,
+                'window_id': i
+            }
+            windows_data.append(window)
+        
+        # Filter windows by quality
+        accepted_windows, filter_stats = self.window_quality.filter_windows_by_quality(windows_data, quality_threshold=0.5)
+        
+        # Check that all windows have quality information added
+        for window in accepted_windows:
+            self.assertIn('quality', window)
+            self.assertIn('quality_metrics', window)
+            self.assertIn('quality_level', window)
+        
+        # Check filter statistics
+        self.assertIn('total_windows', filter_stats)
+        self.assertIn('accepted_windows', filter_stats)
+        self.assertIn('rejection_rate', filter_stats)
+    
+    def test_quality_distribution_analysis(self):
+        """Test quality distribution analysis."""
+        # Create windows with known quality values
+        windows_data = [
+            {'quality': 0.9, 'quality_level': 'excellent'},
+            {'quality': 0.7, 'quality_level': 'good'},
+            {'quality': 0.5, 'quality_level': 'fair'},
+            {'quality': 0.3, 'quality_level': 'poor'},
+        ]
+        
+        distribution = self.window_quality.analyze_quality_distribution(windows_data)
+        
+        # Check distribution structure
+        self.assertIn('quality_statistics', distribution)
+        self.assertIn('quality_level_counts', distribution)
+        self.assertIn('total_windows', distribution)
+        
+        # Verify statistics
+        self.assertEqual(distribution['total_windows'], 4)
+        self.assertEqual(distribution['quality_statistics']['mean'], 0.6)
+
+
 class TestSignalQuality(unittest.TestCase):
     """Test signal quality assessment module."""
     
@@ -155,18 +226,14 @@ class TestSignalQuality(unittest.TestCase):
         self.assertLessEqual(quality_result['overall_score'], 1.0)
     
     def test_windowed_quality_assessment(self):
-        """Test windowed quality assessment."""
+        """Test windowed quality assessment is no longer in SignalQuality."""
         # Create test signal
         bvp_signal = np.random.randn(2000)  # ~31 seconds at 64Hz
         
-        windowed_result = self.signal_quality.assess_windowed_quality(bvp_signal, window_length=640)
+        # This method should no longer exist in SignalQuality
+        self.assertFalse(hasattr(self.signal_quality, 'assess_windowed_quality'))
         
-        # Check result structure
-        self.assertIn('window_scores', windowed_result)
-        self.assertIn('avg_quality', windowed_result)
-        
-        # Should have multiple windows
-        self.assertGreater(len(windowed_result['window_scores']), 1)
+        # Instead, windowed quality should be handled by WindowQuality class
     
     def test_quality_threshold_validation(self):
         """Test quality threshold validation."""
@@ -267,12 +334,13 @@ class TestWindowAnalyzer(unittest.TestCase):
         # Should create some windows
         self.assertGreater(len(windows_result['windows']), 0)
         
-        # Check window structure
+        # Check window structure (quality is no longer added by windowing)
         first_window = windows_result['windows'][0]
         self.assertIn('bvp', first_window)
         self.assertIn('label', first_window)
-        self.assertIn('quality', first_window)
         self.assertIn('confidence', first_window)
+        # Quality is now handled by WindowQuality class
+        self.assertNotIn('quality', first_window)
     
     def test_window_label_calculation(self):
         """Test window label calculation."""

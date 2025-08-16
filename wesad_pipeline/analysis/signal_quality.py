@@ -54,7 +54,6 @@ class SignalQuality:
         # Statistics tracking
         self.stats = {
             'assessments_performed': 0,
-            'segments_assessed': 0,
             'avg_quality_score': 0.0,
             'quality_distribution': {'excellent': 0, 'good': 0, 'fair': 0, 'poor': 0}
         }
@@ -128,64 +127,7 @@ class SignalQuality:
             self.logger.error(f"Quality assessment failed: {str(e)}")
             return self._empty_quality_result()
     
-    def assess_windowed_quality(self, bvp_signal: np.ndarray, window_length: Optional[int] = None) -> Dict:
-        """
-        Assess signal quality using sliding windows.
-        
-        Args:
-            bvp_signal: BVP signal array
-            window_length: Window length in samples. If None, uses config window size.
-            
-        Returns:
-            Dictionary containing windowed quality assessment
-        """
-        if window_length is None:
-            window_length = int(self.window_size)
-        
-        if len(bvp_signal) < window_length:
-            self.logger.warning(f"Signal too short for windowed analysis: {len(bvp_signal)} < {window_length}")
-            return {
-                'window_scores': [],
-                'window_positions': [],
-                'avg_quality': 0.0,
-                'min_quality': 0.0,
-                'max_quality': 0.0,
-                'quality_std': 0.0
-            }
-        
-        overlap = int(self.config.analysis.overlap_seconds * self.sampling_rate)
-        step_size = window_length - overlap
-        
-        window_scores = []
-        window_positions = []
-        
-        # Slide window through signal
-        for start_idx in range(0, len(bvp_signal) - window_length + 1, step_size):
-            end_idx = start_idx + window_length
-            window_signal = bvp_signal[start_idx:end_idx]
-            
-            # Assess quality for this window
-            quality_result = self.assess_signal_quality(window_signal)
-            window_scores.append(quality_result['overall_score'])
-            window_positions.append((start_idx, end_idx))
-            
-            self.stats['segments_assessed'] += 1
-        
-        # Calculate windowed statistics
-        window_scores = np.array(window_scores)
-        windowed_result = {
-            'window_scores': window_scores.tolist(),
-            'window_positions': window_positions,
-            'avg_quality': float(np.mean(window_scores)) if len(window_scores) > 0 else 0.0,
-            'min_quality': float(np.min(window_scores)) if len(window_scores) > 0 else 0.0,
-            'max_quality': float(np.max(window_scores)) if len(window_scores) > 0 else 0.0,
-            'quality_std': float(np.std(window_scores)) if len(window_scores) > 0 else 0.0,
-            'window_length': window_length,
-            'step_size': step_size,
-            'total_windows': len(window_scores)
-        }
-        
-        return windowed_result
+
     
     def _assess_variance_quality(self, bvp_signal: np.ndarray) -> float:
         """Assess signal quality based on variance."""
@@ -374,7 +316,6 @@ class SignalQuality:
         """Reset quality assessment statistics."""
         self.stats = {
             'assessments_performed': 0,
-            'segments_assessed': 0,
             'avg_quality_score': 0.0,
             'quality_distribution': {'excellent': 0, 'good': 0, 'fair': 0, 'poor': 0}
         }
