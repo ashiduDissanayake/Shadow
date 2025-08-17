@@ -1,264 +1,193 @@
 """
-Main WESAD Analysis Pipeline
+WESAD Analysis Pipeline Main Module
 
-Main pipeline orchestrator that coordinates all components of the WESAD analysis
-pipeline including data loading, processing, analysis, visualization, and reporting.
-
-Features:
-- Pipeline orchestration and component integration
-- Command-line interface with configurable options
-- Progress monitoring and comprehensive error handling
-- Flexible execution modes (full analysis, specific components)
-- Automated report generation and data export
+Orchestrates the complete WESAD analysis pipeline with the new processing flow:
+1. Signal Quality Assessment (whole signal)
+2. Windowing (if signal is good)
+3. Windowed Quality Assessment
+4. Heart Rate Analysis
 
 Author: Shadow AI Team
 License: MIT
 """
 
-import argparse
 import logging
-import sys
+import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
-import traceback
+from typing import Dict, List, Optional, Any
 from tqdm import tqdm
 import numpy as np
 
-# Add the project root to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from wesad_pipeline.config import WESADConfig
-from wesad_pipeline.data import WESADDataLoader, WESADPreprocessor
-from wesad_pipeline.analysis import SignalQuality, HeartRateAnalyzer, WindowAnalyzer
-from wesad_pipeline.visualization import SignalPlotter, WindowPlotter, DatasetPlotter
-from wesad_pipeline.utils import WESADHelpers, DocumentationGenerator
+from wesad_pipeline.data.loader import WESADLoader
+from wesad_pipeline.data.preprocessor import WESADPreprocessor
+from wesad_pipeline.analysis.signal_quality import SignalQuality
+from wesad_pipeline.analysis.windowed_quality import WindowedQuality
+from wesad_pipeline.analysis.windowing import WindowAnalyzer
+from wesad_pipeline.analysis.heart_rate import HeartRateAnalyzer
+from wesad_pipeline.visualization.signal_plots import SignalPlotter
+from wesad_pipeline.visualization.window_plots import WindowPlotter
+from wesad_pipeline.visualization.dataset_plots import DatasetPlotter
+from wesad_pipeline.utils.report_generator import ReportGenerator
+from wesad_pipeline.utils.data_exporter import DataExporter
+
+logger = logging.getLogger(__name__)
 
 class WESADPipeline:
     """
-    Main WESAD Analysis Pipeline orchestrator.
+    Main WESAD Analysis Pipeline with improved processing flow.
     
-    Coordinates all pipeline components to provide comprehensive analysis
-    of WESAD dataset including signal processing, quality assessment,
-    windowing analysis, and visualization.
+    Features:
+    - Sequential quality-based processing
+    - Modular analysis components
+    - Comprehensive visualization
+    - Detailed reporting and export
     """
     
-    def __init__(self, 
-                 wesad_path: Optional[str] = None,
-                 output_path: Optional[str] = None,
-                 subjects: Optional[List[int]] = None,
-                 config: Optional[WESADConfig] = None,
-                 log_level: str = "INFO"):
+    def __init__(self, config: WESADConfig):
         """
-        Initialize the WESAD Analysis Pipeline.
+        Initialize the WESAD pipeline.
         
         Args:
-            wesad_path: Path to WESAD dataset directory
-            output_path: Path for output files and reports
-            subjects: List of subject IDs to process (if None, uses config subjects)
-            config: Custom configuration object (if None, creates default)
-            log_level: Logging level
+            config: Pipeline configuration object
         """
-        # Setup configuration
-        if config is None:
-            config = WESADConfig()
-        
-        # Override config parameters if provided
-        if wesad_path is not None:
-            config.dataset.wesad_path = wesad_path
-        if output_path is not None:
-            config.output.output_path = output_path
-        if subjects is not None:
-            config.dataset.subjects = subjects
-        
         self.config = config
-        
-        # Initialize helpers first (needed for logging setup)
-        self.helpers = WESADHelpers(config)
-        
-        # Setup logging
-        self._setup_logging(log_level)
         self.logger = logging.getLogger(__name__)
         
-        # Create output directories
-        self.config.create_output_directories()
+        # Initialize pipeline components
+        self._initialize_components()
         
-        # Initialize components
-        self.data_loader = WESADDataLoader(config)
-        self.preprocessor = WESADPreprocessor(config)
-        self.signal_quality = SignalQuality(config)
-        self.heart_rate_analyzer = HeartRateAnalyzer(config)
-        self.window_analyzer = WindowAnalyzer(config)
-        self.signal_plotter = SignalPlotter(config)
-        self.window_plotter = WindowPlotter(config)
-        self.dataset_plotter = DatasetPlotter(config)
-        self.doc_generator = DocumentationGenerator(config)
+        # Results storage
+        self.results = {}
         
-        # Pipeline state
-        self.pipeline_results = {}
-        self.pipeline_stats = {
-            'subjects_processed': 0,
-            'subjects_failed': 0,
-            'total_windows': 0,
-            'total_duration': 0.0,
-            'processing_time': 0.0
-        }
-        
-        self.logger.info(f"WESAD Pipeline initialized")
-        self.logger.info(f"WESAD path: {config.dataset.wesad_path}")
-        self.logger.info(f"Output path: {config.output.output_path}")
-        self.logger.info(f"Target subjects: {len(config.dataset.subjects)}")
+        self.logger.info("WESAD Pipeline initialized with new processing flow")
     
-    def run_analysis(self, 
-                    subjects: Optional[List[int]] = None,
-                    enable_plots: bool = True,
-                    enable_reports: bool = True,
-                    enable_export: bool = True) -> Dict:
+    def _initialize_components(self):
+        """Initialize all pipeline components."""
+        try:
+            # Data components
+            self.loader = WESADLoader(self.config)
+            self.preprocessor = WESADPreprocessor(self.config)
+            
+            # Analysis components (new order)
+            self.signal_quality = SignalQuality(self.config)
+            self.windowed_quality = WindowedQuality(self.config)
+            self.window_analyzer = WindowAnalyzer(self.config)
+            self.heart_rate = HeartRateAnalyzer(self.config)
+            
+            # Visualization components
+            if self.config.visualization.enable_plotting:
+                self.signal_plotter = SignalPlotter(self.config)
+                self.window_plotter = WindowPlotter(self.config)
+                self.dataset_plotter = DatasetPlotter(self.config)
+            
+            # Export components
+            self.report_generator = ReportGenerator(self.config)
+            self.data_exporter = DataExporter(self.config)
+            
+            self.logger.info("All pipeline components initialized successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize pipeline components: {str(e)}")
+            raise
+    
+    def run_full_pipeline(self, subject_ids: Optional[List[int]] = None) -> Dict[str, Any]:
         """
-        Run complete WESAD analysis pipeline.
+        Run the complete WESAD analysis pipeline with new processing flow.
         
         Args:
-            subjects: Specific subjects to process (if None, uses config subjects)
-            enable_plots: Whether to generate visualization plots
-            enable_reports: Whether to generate analysis reports
-            enable_export: Whether to export processed data
+            subject_ids: Optional list of subject IDs to process
             
         Returns:
-            Dictionary containing complete analysis results
+            Dictionary containing complete pipeline results
         """
         try:
-            self.logger.info("Starting complete WESAD analysis pipeline")
+            self.logger.info("Starting WESAD Analysis Pipeline")
             
-            import time
-            start_time = time.time()
+            # Phase 1: Data loading and preprocessing
+            dataset_results = self.run_data_processing(subject_ids)
             
-            # Step 1: Load and preprocess data
-            dataset_results = self.run_data_processing(subjects)
+            # Phase 2: Signal quality assessment (whole signal)
+            dataset_results = self.run_signal_quality_assessment(dataset_results)
             
-            if not dataset_results:
-                self.logger.error("No data was successfully processed")
-                return {}
-            
-            # Step 2: Run signal analysis
-            dataset_results = self.run_signal_analysis(dataset_results)
-            
-            # Step 3: Run windowing analysis
+            # Phase 3: Windowing (for good quality signals)
             dataset_results = self.run_windowing_analysis(dataset_results)
             
-            # Step 4: Generate visualizations
-            if enable_plots:
-                self.generate_visualizations(dataset_results)
+            # Phase 4: Windowed quality assessment
+            dataset_results = self.run_windowed_quality_assessment(dataset_results)
             
-            # Step 5: Generate reports
-            if enable_reports:
-                self.generate_reports(dataset_results)
+            # Phase 5: Heart rate analysis
+            dataset_results = self.run_heart_rate_analysis(dataset_results)
             
-            # Step 6: Export data
-            if enable_export:
-                self.export_data(dataset_results)
+            # Phase 6: Visualization
+            if self.config.visualization.enable_plotting:
+                self.run_visualization(dataset_results)
             
-            # Calculate final statistics
-            self.pipeline_stats['processing_time'] = time.time() - start_time
+            # Phase 7: Generate reports and export
+            final_results = self.finalize_results(dataset_results)
             
-            self.logger.info(f"Pipeline completed successfully in {self.pipeline_stats['processing_time']:.2f} seconds")
-            self.logger.info(f"Processed {self.pipeline_stats['subjects_processed']} subjects")
-            self.logger.info(f"Generated {self.pipeline_stats['total_windows']} windows")
-            
-            # Store results
-            self.pipeline_results = dataset_results
-            
-            return {
-                'results': dataset_results,
-                'statistics': self.pipeline_stats,
-                'config': self.config.to_dict()
-            }
+            self.logger.info("WESAD Analysis Pipeline completed successfully")
+            return final_results
             
         except Exception as e:
             self.logger.error(f"Pipeline execution failed: {str(e)}")
-            self.logger.error(traceback.format_exc())
-            return {}
+            raise
     
-    def run_data_processing(self, subjects: Optional[List[int]] = None) -> Dict[int, Dict]:
+    def run_data_processing(self, subject_ids: Optional[List[int]] = None) -> Dict[int, Dict]:
         """
-        Run data loading and preprocessing steps.
+        Run data loading and preprocessing phase.
         
         Args:
-            subjects: Specific subjects to process
+            subject_ids: Optional list of subject IDs to process
             
         Returns:
-            Dictionary mapping subject IDs to processed data
+            Dictionary with processed data for each subject
         """
         try:
             self.logger.info("Starting data processing phase")
             
-            # Validate and load subjects
-            if subjects is None:
-                subjects = self.config.dataset.subjects
-            
-            valid_subjects = self.data_loader.validate_subjects(subjects)
-            
-            if not valid_subjects:
-                self.logger.error("No valid subjects found for processing")
-                return {}
-            
             # Load raw data
-            self.logger.info(f"Loading data for {len(valid_subjects)} subjects")
-            raw_data = self.data_loader.load_multiple_subjects(valid_subjects)
+            raw_data = self.loader.load_subjects(subject_ids)
             
-            if not raw_data:
-                self.logger.error("No data was successfully loaded")
-                return {}
+            # Process each subject
+            dataset_results = {}
+            for subject_id, subject_data in tqdm(raw_data.items(), desc="Processing subjects"):
+                try:
+                    processed_data = self.preprocessor.preprocess_subject(subject_data)
+                    dataset_results[subject_id] = {
+                        'raw_data': subject_data,
+                        'processed_data': processed_data,
+                        'processing_status': 'completed'
+                    }
+                except Exception as e:
+                    self.logger.error(f"Processing failed for subject {subject_id}: {str(e)}")
+                    dataset_results[subject_id] = {
+                        'processing_status': 'failed',
+                        'error': str(e)
+                    }
             
-            # Preprocess data
-            self.logger.info("Preprocessing loaded data")
-            processed_data = {}
-            
-            with tqdm(raw_data.items(), desc="Preprocessing subjects") as pbar:
-                for subject_id, subject_raw_data in pbar:
-                    pbar.set_description(f"Preprocessing subject {subject_id}")
-                    
-                    try:
-                        processed_subject_data = self.preprocessor.process_subject_data(subject_raw_data)
-                        processed_data[subject_id] = {
-                            'processed_data': processed_subject_data,
-                            'raw_data': subject_raw_data
-                        }
-                        self.pipeline_stats['subjects_processed'] += 1
-                        
-                        # Update duration statistics
-                        if 'timestamps' in processed_subject_data:
-                            timestamps = processed_subject_data['timestamps']
-                            if len(timestamps) > 0:
-                                duration = timestamps[-1] - timestamps[0]
-                                self.pipeline_stats['total_duration'] += duration
-                        
-                    except Exception as e:
-                        self.logger.error(f"Failed to preprocess subject {subject_id}: {str(e)}")
-                        self.pipeline_stats['subjects_failed'] += 1
-                        continue
-            
-            self.logger.info(f"Data processing completed: {len(processed_data)} subjects")
-            
-            return processed_data
+            self.logger.info(f"Data processing completed for {len(dataset_results)} subjects")
+            return dataset_results
             
         except Exception as e:
-            self.logger.error(f"Data processing failed: {str(e)}")
-            return {}
+            self.logger.error(f"Data processing phase failed: {str(e)}")
+            raise
     
-    def run_signal_analysis(self, dataset_results: Dict[int, Dict]) -> Dict[int, Dict]:
+    def run_signal_quality_assessment(self, dataset_results: Dict[int, Dict]) -> Dict[int, Dict]:
         """
-        Run signal quality assessment and heart rate analysis.
+        Run signal quality assessment phase (whole signal).
         
         Args:
             dataset_results: Results from data processing
             
         Returns:
-            Updated dataset results with signal analysis
+            Updated dataset results with signal quality assessment
         """
         try:
-            self.logger.info("Starting signal analysis phase")
+            self.logger.info("Starting signal quality assessment phase")
             
-            for subject_id, results in tqdm(dataset_results.items(), desc="Signal analysis"):
-                if 'processed_data' not in results:
+            for subject_id, results in tqdm(dataset_results.items(), desc="Signal quality assessment"):
+                if results.get('processing_status') != 'completed':
                     continue
                 
                 processed_data = results['processed_data']
@@ -269,32 +198,46 @@ class WESADPipeline:
                     continue
                 
                 try:
-                    # Signal quality assessment
-                    if self.config.analysis.enable_quality_assessment:
-                        quality_result = self.signal_quality.assess_signal_quality(bvp_signal)
-                        results['signal_quality_result'] = quality_result
+                    # Assess overall signal quality
+                    quality_result = self.signal_quality.assess_signal_quality(bvp_signal)
+                    results['signal_quality_result'] = quality_result
                     
-                    # Heart rate analysis
-                    heart_rate_result = self.heart_rate_analyzer.estimate_heart_rate(bvp_signal)
-                    results['heart_rate_result'] = heart_rate_result
+                    # Check if signal meets quality threshold
+                    quality_threshold = self.config.analysis.quality_threshold
+                    meets_threshold = quality_result['overall_score'] >= quality_threshold
+                    results['signal_quality_passed'] = meets_threshold
+                    
+                    if meets_threshold:
+                        self.logger.debug(f"Subject {subject_id}: Signal quality passed "
+                                        f"(score: {quality_result['overall_score']:.3f})")
+                    else:
+                        self.logger.warning(f"Subject {subject_id}: Signal quality failed "
+                                          f"(score: {quality_result['overall_score']:.3f} < {quality_threshold})")
                     
                 except Exception as e:
-                    self.logger.error(f"Signal analysis failed for subject {subject_id}: {str(e)}")
-                    continue
+                    self.logger.error(f"Signal quality assessment failed for subject {subject_id}: {str(e)}")
+                    results['signal_quality_result'] = None
+                    results['signal_quality_passed'] = False
             
-            self.logger.info("Signal analysis completed")
+            # Count subjects that passed quality assessment
+            passed_subjects = sum(1 for r in dataset_results.values() 
+                                if r.get('signal_quality_passed', False))
+            total_subjects = len([r for r in dataset_results.values() 
+                                if r.get('processing_status') == 'completed'])
+            
+            self.logger.info(f"Signal quality assessment completed: {passed_subjects}/{total_subjects} subjects passed")
             return dataset_results
             
         except Exception as e:
-            self.logger.error(f"Signal analysis phase failed: {str(e)}")
-            return dataset_results
+            self.logger.error(f"Signal quality assessment phase failed: {str(e)}")
+            raise
     
     def run_windowing_analysis(self, dataset_results: Dict[int, Dict]) -> Dict[int, Dict]:
         """
-        Run windowing analysis and feature extraction.
+        Run windowing analysis phase (only for good quality signals).
         
         Args:
-            dataset_results: Results from signal analysis
+            dataset_results: Results from signal quality assessment
             
         Returns:
             Updated dataset results with windowing analysis
@@ -302,348 +245,279 @@ class WESADPipeline:
         try:
             self.logger.info("Starting windowing analysis phase")
             
+            processed_subjects = 0
             for subject_id, results in tqdm(dataset_results.items(), desc="Windowing analysis"):
-                if 'processed_data' not in results:
+                # Only process subjects that passed signal quality assessment
+                if not results.get('signal_quality_passed', False):
                     continue
                 
                 processed_data = results['processed_data']
                 bvp_signal = processed_data.get('bvp', np.array([]))
                 labels = processed_data.get('labels', np.array([]))
-                timestamps = processed_data.get('timestamps', np.array([]))
                 
                 if len(bvp_signal) == 0 or len(labels) == 0:
-                    self.logger.warning(f"Insufficient data for windowing analysis: subject {subject_id}")
+                    self.logger.warning(f"Insufficient data for subject {subject_id}")
                     continue
                 
                 try:
                     # Create windows
-                    windowing_result = self.window_analyzer.create_windows(
-                        bvp_signal, labels, timestamps
-                    )
-                    results['windowing_result'] = windowing_result
+                    windows_result = self.window_analyzer.create_windows(bvp_signal, labels)
+                    results['windows_result'] = windows_result
+                    processed_subjects += 1
                     
-                    # Update statistics
-                    metadata = windowing_result.get('metadata', {})
-                    self.pipeline_stats['total_windows'] += metadata.get('accepted_windows', 0)
-                    
-                    # Extract features if requested
-                    if self.config.analysis.enable_time_domain or self.config.analysis.enable_frequency_domain:
-                        features_result = self.window_analyzer.extract_window_features(windowing_result)
-                        results['features_result'] = features_result
+                    self.logger.debug(f"Subject {subject_id}: Created {len(windows_result['windows'])} windows")
                     
                 except Exception as e:
-                    self.logger.error(f"Windowing analysis failed for subject {subject_id}: {str(e)}")
-                    continue
+                    self.logger.error(f"Windowing failed for subject {subject_id}: {str(e)}")
+                    results['windows_result'] = None
             
-            self.logger.info("Windowing analysis completed")
+            self.logger.info(f"Windowing analysis completed for {processed_subjects} subjects")
             return dataset_results
             
         except Exception as e:
             self.logger.error(f"Windowing analysis phase failed: {str(e)}")
-            return dataset_results
+            raise
     
-    def generate_visualizations(self, dataset_results: Dict[int, Dict]) -> None:
+    def run_windowed_quality_assessment(self, dataset_results: Dict[int, Dict]) -> Dict[int, Dict]:
         """
-        Generate comprehensive visualizations.
+        Run windowed quality assessment phase.
         
         Args:
-            dataset_results: Complete analysis results
+            dataset_results: Results from windowing analysis
+            
+        Returns:
+            Updated dataset results with windowed quality assessment
         """
         try:
-            self.logger.info("Generating visualizations")
+            self.logger.info("Starting windowed quality assessment phase")
             
-            # Subject-specific plots
-            for subject_id, results in tqdm(dataset_results.items(), desc="Subject plots"):
-                if 'processed_data' not in results:
+            processed_subjects = 0
+            for subject_id, results in tqdm(dataset_results.items(), desc="Windowed quality assessment"):
+                # Only process subjects that have windows
+                if 'windows_result' not in results or results['windows_result'] is None:
                     continue
                 
                 processed_data = results['processed_data']
+                bvp_signal = processed_data.get('bvp', np.array([]))
                 
-                try:
-                    # Subject overview plot
-                    fig = self.signal_plotter.plot_subject_overview(
-                        processed_data, subject_id, 
-                        save_name=f"subject_{subject_id}_overview"
-                    )
-                    
-                    # Windowing visualization
-                    if 'windowing_result' in results:
-                        windowing_result = results['windowing_result']
-                        
-                        # Window creation plot
-                        fig = self.window_plotter.plot_window_creation(
-                            processed_data['bvp'], processed_data['labels'],
-                            windowing_result, processed_data.get('timestamps'),
-                            subject_id=subject_id,
-                            save_name=f"subject_{subject_id}_windowing"
-                        )
-                        
-                        # Window distributions
-                        fig = self.window_plotter.plot_window_distributions(
-                            windowing_result, subject_id=subject_id,
-                            save_name=f"subject_{subject_id}_window_distributions"
-                        )
-                
-                except Exception as e:
-                    self.logger.error(f"Failed to generate plots for subject {subject_id}: {str(e)}")
+                if len(bvp_signal) == 0:
                     continue
-            
-            # Dataset-wide plots
-            try:
-                # Dataset overview
-                fig = self.dataset_plotter.plot_dataset_overview(
-                    dataset_results, save_name="dataset_overview"
-                )
                 
-                # Subject comparisons
-                for metric in ['quality', 'heart_rate', 'windows_count']:
-                    fig = self.dataset_plotter.plot_subject_comparison(
-                        dataset_results, metric=metric,
-                        save_name=f"subject_comparison_{metric}"
-                    )
-                
-                # Condition analysis
-                fig = self.dataset_plotter.plot_condition_analysis(
-                    dataset_results, save_name="condition_analysis"
-                )
-            
-            except Exception as e:
-                self.logger.error(f"Failed to generate dataset plots: {str(e)}")
-            
-            self.logger.info("Visualization generation completed")
-            
-        except Exception as e:
-            self.logger.error(f"Visualization generation failed: {str(e)}")
-    
-    def generate_reports(self, dataset_results: Dict[int, Dict]) -> None:
-        """
-        Generate comprehensive analysis reports.
-        
-        Args:
-            dataset_results: Complete analysis results
-        """
-        try:
-            self.logger.info("Generating analysis reports")
-            
-            # Subject reports
-            for subject_id, results in tqdm(dataset_results.items(), desc="Subject reports"):
                 try:
-                    self.doc_generator.generate_subject_report(subject_id, results)
+                    # Assess windowed quality
+                    windowed_quality_result = self.windowed_quality.assess_windowed_quality(bvp_signal)
+                    results['windowed_quality_result'] = windowed_quality_result
+                    
+                    # Validate windowed quality
+                    validation_result = self.windowed_quality.validate_windowed_quality(bvp_signal)
+                    results['windowed_quality_validation'] = validation_result
+                    
+                    processed_subjects += 1
+                    
+                    threshold_ratio = windowed_quality_result['threshold_ratio']
+                    self.logger.debug(f"Subject {subject_id}: {threshold_ratio:.1%} windows above quality threshold")
+                    
                 except Exception as e:
-                    self.logger.error(f"Failed to generate report for subject {subject_id}: {str(e)}")
+                    self.logger.error(f"Windowed quality assessment failed for subject {subject_id}: {str(e)}")
+                    results['windowed_quality_result'] = None
+                    results['windowed_quality_validation'] = None
             
-            # Dataset report
-            try:
-                self.doc_generator.generate_dataset_report(dataset_results)
-            except Exception as e:
-                self.logger.error(f"Failed to generate dataset report: {str(e)}")
-            
-            # Summary report
-            try:
-                summary = self.doc_generator.create_analysis_summary(dataset_results)
-                summary_path = self.helpers.ensure_output_directory("reports") / "analysis_summary.txt"
-                with open(summary_path, 'w') as f:
-                    f.write(summary)
-                self.logger.info(f"Analysis summary saved to {summary_path}")
-            except Exception as e:
-                self.logger.error(f"Failed to generate summary report: {str(e)}")
-            
-            self.logger.info("Report generation completed")
+            self.logger.info(f"Windowed quality assessment completed for {processed_subjects} subjects")
+            return dataset_results
             
         except Exception as e:
-            self.logger.error(f"Report generation failed: {str(e)}")
+            self.logger.error(f"Windowed quality assessment phase failed: {str(e)}")
+            raise
     
-    def export_data(self, dataset_results: Dict[int, Dict]) -> None:
+    def run_heart_rate_analysis(self, dataset_results: Dict[int, Dict]) -> Dict[int, Dict]:
         """
-        Export processed data in multiple formats.
+        Run heart rate analysis phase.
+        
+        Args:
+            dataset_results: Results from windowed quality assessment
+            
+        Returns:
+            Updated dataset results with heart rate analysis
+        """
+        try:
+            self.logger.info("Starting heart rate analysis phase")
+            
+            processed_subjects = 0
+            for subject_id, results in tqdm(dataset_results.items(), desc="Heart rate analysis"):
+                # Only process subjects with windowed quality results
+                if 'windowed_quality_result' not in results:
+                    continue
+                
+                processed_data = results['processed_data']
+                bvp_signal = processed_data.get('bvp', np.array([]))
+                
+                if len(bvp_signal) == 0:
+                    continue
+                
+                try:
+                    # Heart rate analysis
+                    hr_result = self.heart_rate.estimate_heart_rate(bvp_signal)
+                    results['heart_rate_result'] = hr_result
+                    processed_subjects += 1
+                    
+                    mean_hr = hr_result.get('mean_hr', 0)
+                    self.logger.debug(f"Subject {subject_id}: Mean heart rate {mean_hr:.1f} BPM")
+                    
+                except Exception as e:
+                    self.logger.error(f"Heart rate analysis failed for subject {subject_id}: {str(e)}")
+                    results['heart_rate_result'] = None
+            
+            self.logger.info(f"Heart rate analysis completed for {processed_subjects} subjects")
+            return dataset_results
+            
+        except Exception as e:
+            self.logger.error(f"Heart rate analysis phase failed: {str(e)}")
+            raise
+    
+    def run_visualization(self, dataset_results: Dict[int, Dict]):
+        """
+        Run visualization phase.
         
         Args:
             dataset_results: Complete analysis results
         """
         try:
-            self.logger.info("Exporting processed data")
+            self.logger.info("Starting visualization phase")
             
-            exported_files = self.doc_generator.export_processed_data(dataset_results)
+            # Generate visualizations for each subject
+            for subject_id, results in dataset_results.items():
+                if results.get('processing_status') != 'completed':
+                    continue
+                
+                try:
+                    # Signal plots
+                    if 'processed_data' in results:
+                        processed_data = results['processed_data']
+                        bvp_signal = processed_data.get('bvp', np.array([]))
+                        labels = processed_data.get('labels', np.array([]))
+                        
+                        if len(bvp_signal) > 0:
+                            self.signal_plotter.plot_bvp_signal(
+                                bvp_signal, labels, subject_id=subject_id,
+                                save_name=f"bvp_signal_subject_{subject_id}"
+                            )
+                    
+                    # Quality plots
+                    if 'signal_quality_result' in results and results['signal_quality_result']:
+                        quality_result = results['signal_quality_result']
+                        # Add quality visualization here
+                    
+                    # Window plots
+                    if 'windows_result' in results and results['windows_result']:
+                        windows_result = results['windows_result']
+                        # Add window visualization here
+                    
+                    # Heart rate plots
+                    if 'heart_rate_result' in results and results['heart_rate_result']:
+                        hr_result = results['heart_rate_result']
+                        # Add heart rate visualization here
+                        
+                except Exception as e:
+                    self.logger.error(f"Visualization failed for subject {subject_id}: {str(e)}")
             
-            total_files = sum(len(files) for files in exported_files.values())
-            self.logger.info(f"Data export completed: {total_files} files generated")
+            # Generate dataset-wide visualizations
+            try:
+                self.dataset_plotter.plot_dataset_overview(dataset_results)
+            except Exception as e:
+                self.logger.error(f"Dataset overview visualization failed: {str(e)}")
             
-            for format, files in exported_files.items():
-                if files:
-                    self.logger.info(f"{format.upper()}: {len(files)} files")
+            self.logger.info("Visualization phase completed")
             
         except Exception as e:
-            self.logger.error(f"Data export failed: {str(e)}")
+            self.logger.error(f"Visualization phase failed: {str(e)}")
     
-    def get_pipeline_statistics(self) -> Dict:
-        """Get comprehensive pipeline statistics."""
-        # Combine pipeline stats with component stats
-        stats = self.pipeline_stats.copy()
+    def finalize_results(self, dataset_results: Dict[int, Dict]) -> Dict[str, Any]:
+        """
+        Generate final reports and export results.
         
-        stats['component_statistics'] = {
-            'data_loader': self.data_loader.get_dataset_statistics(),
-            'preprocessor': self.preprocessor.get_processing_statistics(),
-            'signal_quality': self.signal_quality.get_quality_statistics(),
-            'heart_rate_analyzer': self.heart_rate_analyzer.get_hr_statistics(),
-            'window_analyzer': self.window_analyzer.get_windowing_statistics()
+        Args:
+            dataset_results: Complete analysis results
+            
+        Returns:
+            Final pipeline results
+        """
+        try:
+            self.logger.info("Finalizing pipeline results")
+            
+            # Generate comprehensive report
+            report = self.report_generator.generate_pipeline_report(dataset_results)
+            
+            # Export data
+            export_summary = self.data_exporter.export_dataset_results(dataset_results)
+            
+            # Create final results summary
+            final_results = {
+                'pipeline_config': self.config.to_dict(),
+                'dataset_results': dataset_results,
+                'pipeline_report': report,
+                'export_summary': export_summary,
+                'pipeline_statistics': self._calculate_pipeline_statistics(dataset_results)
+            }
+            
+            # Save final results
+            if self.config.export.save_results:
+                results_path = Path(self.config.export.output_dir) / "final_results.json"
+                with open(results_path, 'w') as f:
+                    json.dump(final_results, f, indent=2, default=str)
+                self.logger.info(f"Final results saved to {results_path}")
+            
+            self.logger.info("Pipeline finalization completed")
+            return final_results
+            
+        except Exception as e:
+            self.logger.error(f"Pipeline finalization failed: {str(e)}")
+            raise
+    
+    def _calculate_pipeline_statistics(self, dataset_results: Dict[int, Dict]) -> Dict[str, Any]:
+        """Calculate overall pipeline statistics."""
+        stats = {
+            'total_subjects': len(dataset_results),
+            'successfully_processed': 0,
+            'quality_passed': 0,
+            'windowed': 0,
+            'heart_rate_analyzed': 0,
+            'processing_success_rate': 0.0,
+            'quality_pass_rate': 0.0
         }
         
+        for results in dataset_results.values():
+            if results.get('processing_status') == 'completed':
+                stats['successfully_processed'] += 1
+                
+                if results.get('signal_quality_passed', False):
+                    stats['quality_passed'] += 1
+                    
+                    if 'windows_result' in results:
+                        stats['windowed'] += 1
+                        
+                        if 'heart_rate_result' in results:
+                            stats['heart_rate_analyzed'] += 1
+        
+        if stats['total_subjects'] > 0:
+            stats['processing_success_rate'] = stats['successfully_processed'] / stats['total_subjects']
+            
+        if stats['successfully_processed'] > 0:
+            stats['quality_pass_rate'] = stats['quality_passed'] / stats['successfully_processed']
+        
         return stats
-    
-    def _setup_logging(self, log_level: str) -> None:
-        """Setup logging configuration."""
-        # Create logs directory
-        logs_dir = Path(self.config.output.output_path) / self.config.output.logs_dir
-        logs_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Setup logging
-        log_file = logs_dir / f"wesad_pipeline_{self.helpers.create_timestamp_string()}.log"
-        
-        logging.basicConfig(
-            level=getattr(logging, log_level.upper()),
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-
-
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="WESAD Analysis Pipeline",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    
-    parser.add_argument(
-        '--wesad-path', 
-        type=str, 
-        default="data/raw/wesad/",
-        help="Path to WESAD dataset directory"
-    )
-    
-    parser.add_argument(
-        '--output-path', 
-        type=str, 
-        default="wesad_analysis/",
-        help="Output directory for results"
-    )
-    
-    parser.add_argument(
-        '--subjects', 
-        type=int, 
-        nargs='+',
-        help="Specific subject IDs to process (e.g., 2 3 4 5)"
-    )
-    
-    parser.add_argument(
-        '--log-level', 
-        type=str, 
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-        default='INFO',
-        help="Logging level"
-    )
-    
-    parser.add_argument(
-        '--no-plots', 
-        action='store_true',
-        help="Disable visualization generation"
-    )
-    
-    parser.add_argument(
-        '--no-reports', 
-        action='store_true',
-        help="Disable report generation"
-    )
-    
-    parser.add_argument(
-        '--no-export', 
-        action='store_true',
-        help="Disable data export"
-    )
-    
-    parser.add_argument(
-        '--window-size', 
-        type=int, 
-        default=60,
-        help="Window size in seconds"
-    )
-    
-    parser.add_argument(
-        '--overlap', 
-        type=int, 
-        default=5,
-        help="Window overlap in seconds"
-    )
-    
-    parser.add_argument(
-        '--quality-threshold', 
-        type=float, 
-        default=0.6,
-        help="Minimum quality threshold for windows"
-    )
-    
-    return parser.parse_args()
-
 
 def main():
-    """Main entry point for the WESAD Analysis Pipeline."""
-    try:
-        # Parse arguments
-        args = parse_arguments()
-        
-        # Create custom configuration if needed
-        config = WESADConfig()
-        
-        # Update configuration with command line arguments
-        if args.window_size != 60:
-            config.analysis.window_size_seconds = args.window_size
-        if args.overlap != 5:
-            config.analysis.overlap_seconds = args.overlap
-        if args.quality_threshold != 0.6:
-            config.analysis.quality_threshold = args.quality_threshold
-        
-        # Initialize pipeline
-        pipeline = WESADPipeline(
-            wesad_path=args.wesad_path,
-            output_path=args.output_path,
-            subjects=args.subjects,
-            config=config,
-            log_level=args.log_level
-        )
-        
-        # Run analysis
-        results = pipeline.run_analysis(
-            enable_plots=not args.no_plots,
-            enable_reports=not args.no_reports,
-            enable_export=not args.no_export
-        )
-        
-        if results:
-            print("\n" + "="*60)
-            print("WESAD ANALYSIS PIPELINE COMPLETED SUCCESSFULLY")
-            print("="*60)
-            
-            stats = results['statistics']
-            print(f"Subjects processed: {stats['subjects_processed']}")
-            print(f"Total windows generated: {stats['total_windows']}")
-            print(f"Total signal duration: {stats['total_duration']:.1f} seconds")
-            print(f"Processing time: {stats['processing_time']:.2f} seconds")
-            print(f"Output directory: {args.output_path}")
-            
-        else:
-            print("\nPipeline execution failed. Check logs for details.")
-            sys.exit(1)
-        
-    except KeyboardInterrupt:
-        print("\nPipeline interrupted by user.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\nPipeline failed with error: {str(e)}")
-        traceback.print_exc()
-        sys.exit(1)
-
+    """Main entry point for the WESAD pipeline."""
+    # Load configuration
+    config = WESADConfig()
+    
+    # Initialize and run pipeline
+    pipeline = WESADPipeline(config)
+    results = pipeline.run_full_pipeline()
+    
+    print(f"Pipeline completed successfully!")
+    print(f"Processed {results['pipeline_statistics']['total_subjects']} subjects")
+    print(f"Quality pass rate: {results['pipeline_statistics']['quality_pass_rate']:.1%}")
 
 if __name__ == "__main__":
     main()
