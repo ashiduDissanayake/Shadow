@@ -30,23 +30,29 @@
 
 ## Current Status
 
-### Week 4: AI/ML Model Development (Current)
-- ✅ **Modular AI Structure**: Organized AI model development with proper folder structure
-- ✅ **Stress Detection Model**: ESP32-based stress detection implementation
-- ✅ **ML Model Comparison**: Comprehensive analysis of different ML approaches
-- 🔄 **Model Optimization**: Ongoing development and testing of AI models
+### Week 5: H-CNN Model Enhancement & TinyML Integration (Current)
+- 🔄 **H-CNN Implementation**: Optimizing Hybrid CNN model for improved stress detection accuracy
+- 🔄 **TinyML Integration**: Converting trained models for ESP32-S3 deployment
+- ✅ **Multi-Sensor Integration**: Three physiological sensors integrated with ESP32-S3
+- ✅ **Real-time Data Acquisition**: 5 physiological parameters collected without latency
 
-### Week 3: Hardware Integration
+### Week 4: AI/ML Model Development (Completed)
+- ✅ **Modular AI Structure**: Organized AI model development with proper folder structure
+- ✅ **WESAD Dataset Integration**: Complete stress detection model training
+- ✅ **ML Model Comparison**: Comprehensive analysis of different ML approaches
+- ✅ **Baseline Model**: Initial stress detection implementation
+
+### Week 3: Hardware Integration (Completed)
 - ✅ **Device Documentation**: Complete hardware specs for MacBook, Android, and wearable devices
 - ✅ **Feasibility Report**: End-to-end integration approach and device compatibility analysis
 - ✅ **Hardware Architecture**: Detailed system integration design
 
-### Week 2: Architecture Design
+### Week 2: Architecture Design (Completed)
 - ✅ **Software Architecture**: C4-UML inspired system design
 - ✅ **Hardware Architecture**: Device integration blueprint
 - ✅ **Component Design**: Modular system architecture
 
-### Week 1: Project Foundation
+### Week 1: Project Foundation (Completed)
 - ✅ **Requirements Specification**: Complete SRS documentation
 - ✅ **Project Vision**: Core concept and technical approach defined
 - ✅ **Initial Presentations**: Project overview and technical specifications
@@ -68,63 +74,77 @@
 
 ---
 
-## Development Roadmap
+## 12-Week Development Roadmap
 
-### Completed ✅
+### ✅ Completed Weeks (1-5)
 - **Week 1**: Project foundation and requirements specification
 - **Week 2**: Software and hardware architecture design  
 - **Week 3**: Device compatibility analysis and documentation
-- **Week 4**: AI/ML model development and optimization
+- **Week 4**: AI/ML model development with WESAD dataset
+- **Week 5**: Basic sensor integration and model training
 
-### Current Week 🔄
-**Week 5: Hardware Setup & Initial BVP Data Acquisition (Days 1-3)**
-- Unbox & connect LilyGo T-Display-S3 + MAX30102
-- Set up ESP32-S3 dev environment (ESP-IDF)
-- Acquire and verify raw BVP output
+### 🔄 Current Focus (Week 5-6)
+**H-CNN Model Enhancement & TinyML Deployment**
+- Implement Hybrid CNN architecture for improved accuracy
+- Complete TinyML model conversion for ESP32-S3
+- Optimize model size and inference speed for embedded deployment
+- Validate model performance on ESP32-S3 hardware
 
-### Upcoming ⏳
+### ⏳ Upcoming Development Phase
 
-**Week 6: On-Device BVP Preprocessing & Feature Extraction (Days 4-5)**
-- Implement causal bandpass filter in C++ for BVP
-- Port simplified HRV feature extraction to ESP32-S3
+**Week 6-7: ESP32-S3 Firmware & BLE Communication**
+- Complete ESP32-S3 firmware with TinyML inference
+- Implement BLE enhanced protocol for device communication
+- Develop real-time data preprocessing pipeline on ESP32
+- Test multi-sensor data fusion and local ML inference
 
-**Week 7: TinyML BVP Model Integration & Inference (Days 6-9)**
-- Convert H-CNN TinyML model (BVP-only) to int8 C array
-- Integrate TensorFlow Lite Micro in ESP32-S3 firmware
-- Feed preprocessed BVP data into model and get predictions
+**Week 7-8: Host Application Development**
+- Complete Swift/macOS companion application
+- Implement BLE communication stack on host side
+- Develop data preprocessing and analysis pipeline
+- Integrate screen usage monitoring for contextual stress detection
 
-**Week 8: System Testing & Refinement (BVP-only) (Days 10-14)**
-- End-to-end testing with live BVP data
-- Log predictions & performance metrics for BVP model
-- Identify optimizations for latency, accuracy, and battery use for BVP processing
+**Week 8-9: Stress Detection Algorithm Integration**
+- Combine physiological data with screen usage patterns
+- Implement comprehensive stress detection algorithm
+- Develop feedback mechanisms and user notifications
+- Test end-to-end stress detection accuracy
 
-**Week 9: Battery Optimization, Power Profiling & Robustness Improvements**
-- Measure real-world power consumption for BVP processing
-- Optimize sampling rate & duty cycles for BVP sensor
-- Add low-power sleep/wake cycles for BVP processing
-- Handle noisy/weak BVP signals
-- Implement fallback logic when BVP sensor contact is poor
-- Test with different skin tones & motion profiles for BVP data
+**Week 10-11: System Optimization & Testing**
+- Optimize power consumption on ESP32-S3
+- Implement low-power modes and duty cycling
+- Comprehensive system testing and validation
+- Performance tuning and accuracy improvements, benchmarking
 
-**Week 10: Multi-Sensor Integration (ACC, GSR, MLX90614) & Model Expansion**
-- Integrate MPU9250 (Accelerometer), GSR Grove, and MLX90614ESF with LilyGo T-Display-S3
-- Develop/adapt models for ACC+BVP data fusion and combined BVP, ACC, GSR, and MLX90614 data
-- Implement on-device preprocessing and inference for multi-sensor models
+**Week 11-12: Final Integration & Documentation**
+- Complete ecosystem integration (wearable + phone + laptop)
+- Implement advanced analytics and trend visualization
+- Finalize documentation and user guides
+- Prepare for open-source release
 
-**Week 11: Cross-Platform Data Sync & Initial Companion App Integration**
-- Implement lightweight peer-to-peer sync between wearable and Android/Linux app for all sensor data
-- Secure encrypted transport for all data streams
-- Display stress levels and other wellness metrics in real time on Android/Linux app
+---
 
-**Week 12: Advanced Companion App Features & Comprehensive Testing**
-- Implement basic historical trend visualization for all collected data
-- Comprehensive system testing and validation with all sensors and features
-- Identify and address any remaining bugs or performance issues
+## Current Technical Stack
 
-**Week 13: Final Integration, Documentation & Open-Sourcing**
-- Integrate the wearable with other devices (Android phone, MacBook) for a unified ecosystem
-- Finalize all project documentation, including user guides and developer notes
-- Prepare the project for open-sourcing, including code cleanup and licensing
+### Hardware Components
+- **ESP32-S3**: Main processing unit with TinyML capabilities
+- **MAX30102**: Heart rate and SpO2 sensor
+- **MPU9250**: 9-axis motion sensor
+- **GSR Grove**: Galvanic skin response sensor
+- **MLX90614**: Non-contact temperature sensor
+
+### Software Architecture
+- **ESP32 Firmware**: C++ with ESP-IDF framework
+- **TinyML**: TensorFlow Lite Micro for on-device inference
+- **Host Application**: Swift (macOS) / Kotlin (Android)
+- **Communication**: BLE enhanced protocol
+- **ML Pipeline**: Python with TensorFlow/PyTorch
+
+### Current Capabilities
+- Real-time acquisition of 5 physiological parameters
+- UART communication for development/debugging
+- Basic stress detection using WESAD-trained models
+- Multi-sensor data fusion on ESP32-S3
 
 ---
 
@@ -135,6 +155,7 @@
 - **Week 2**: [`deliverables/week2/`](deliverables/week2/) - Architecture designs
 - **Week 3**: [`deliverables/week3/`](deliverables/week3/) - Hardware documentation
 - **Week 4**: [`deliverables/week4/`](deliverables/week4/) - AI/ML models
+- **Week 5**: [`deliverables/week5/`](deliverables/week5/) - H-CNN and TinyML integration
 - **AI Models**: [`models/`](models/) - Complete AI model development structure
 
 ### Research Papers

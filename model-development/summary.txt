@@ -1,0 +1,8 @@
+window size = 30
+step size = 1
+* 'bootstrap', True
+* 'etc__criterion', 'log_loss'
+* 'etc__max_features', 0.6
+* 'etc__min_samples_leaf', 5
+* 'etc__min_samples_split', 14
+* 'etc__n_estimators', 50
