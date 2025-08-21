@@ -30,9 +30,15 @@
 
 ## Current Status
 
-### Week 5: H-CNN Model Enhancement & TinyML Integration (Current)
-- 🔄 **H-CNN Implementation**: Optimizing Hybrid CNN model for improved stress detection accuracy
-- 🔄 **TinyML Integration**: Converting trained models for ESP32-S3 deployment
+### Week 6: MLOps Pipeline & NLP Integration (Current)
+- 🔄 **MLOps Pipeline**: Building deployment-ready ML model pipeline for production use
+- 🔄 **NLP Model Development**: Creating custom message generator for personalized stress insights
+- 🔄 **Model Deployment**: Implementing containerized deployment environment for cross-platform compatibility
+- 🔄 **Automated Testing**: Creating model validation and testing frameworks
+
+### Week 5: Model Finalization & TinyML Integration (Completed)
+- ✅ **ExtraTreeClassifier Optimization**: Achieved required performance with ExtraTreeClassifier (no H-CNN needed)
+- ✅ **Model Architecture**: Finalized and optimized ML model structure with satisfactory accuracy
 - ✅ **Multi-Sensor Integration**: Three physiological sensors integrated with ESP32-S3
 - ✅ **Real-time Data Acquisition**: 5 physiological parameters collected without latency
 
@@ -81,30 +87,30 @@
 - **Week 2**: Software and hardware architecture design  
 - **Week 3**: Device compatibility analysis and documentation
 - **Week 4**: AI/ML model development with WESAD dataset
-- **Week 5**: Basic sensor integration and model training
+- **Week 5**: Model finalization with ExtraTreeClassifier
 
-### 🔄 Current Focus (Week 5-6)
-**H-CNN Model Enhancement & TinyML Deployment**
-- Implement Hybrid CNN architecture for improved accuracy
-- Complete TinyML model conversion for ESP32-S3
-- Optimize model size and inference speed for embedded deployment
-- Validate model performance on ESP32-S3 hardware
+### 🔄 Current Focus (Week 6)
+**MLOps Pipeline Development & NLP Integration**
+- Building deployment-ready MLOps pipeline for model versioning and CI/CD
+- Developing NLP model for personalized stress management message generation
+- Implementing automated model testing and validation frameworks
+- Creating containerized deployment environment for cross-platform compatibility
 
 ### ⏳ Upcoming Development Phase
 
-**Week 6-7: ESP32-S3 Firmware & BLE Communication**
+**Week 7: ESP32-S3 Firmware & BLE Communication**
 - Complete ESP32-S3 firmware with TinyML inference
 - Implement BLE enhanced protocol for device communication
 - Develop real-time data preprocessing pipeline on ESP32
 - Test multi-sensor data fusion and local ML inference
 
-**Week 7-8: Host Application Development**
+**Week 8: Host Application Development**
 - Complete Swift/macOS companion application
 - Implement BLE communication stack on host side
 - Develop data preprocessing and analysis pipeline
 - Integrate screen usage monitoring for contextual stress detection
 
-**Week 8-9: Stress Detection Algorithm Integration**
+**Week 9: Stress Detection Algorithm Integration**
 - Combine physiological data with screen usage patterns
 - Implement comprehensive stress detection algorithm
 - Develop feedback mechanisms and user notifications
@@ -138,13 +144,17 @@
 - **TinyML**: TensorFlow Lite Micro for on-device inference
 - **Host Application**: Swift (macOS) / Kotlin (Android)
 - **Communication**: BLE enhanced protocol
-- **ML Pipeline**: Python with TensorFlow/PyTorch
+- **ML Pipeline**: Python with scikit-learn (ExtraTreeClassifier)
+- **MLOps**: Docker, CI/CD pipelines, model versioning
+- **NLP**: Custom message generation for stress insights
 
 ### Current Capabilities
 - Real-time acquisition of 5 physiological parameters
 - UART communication for development/debugging
-- Basic stress detection using WESAD-trained models
+- Optimized stress detection using ExtraTreeClassifier
 - Multi-sensor data fusion on ESP32-S3
+- Production-ready ML model pipeline
+- Personalized stress management messaging
 
 ---
 
@@ -155,7 +165,8 @@
 - **Week 2**: [`deliverables/week2/`](deliverables/week2/) - Architecture designs
 - **Week 3**: [`deliverables/week3/`](deliverables/week3/) - Hardware documentation
 - **Week 4**: [`deliverables/week4/`](deliverables/week4/) - AI/ML models
-- **Week 5**: [`deliverables/week5/`](deliverables/week5/) - H-CNN and TinyML integration
+- **Week 5**: [`deliverables/week5/`](deliverables/week5/) - ExtraTreeClassifier optimization and TinyML integration
+- **Week 6**: [`deliverables/week6/`](deliverables/week6/) - MLOps pipeline and NLP models
 - **AI Models**: [`models/`](models/) - Complete AI model development structure
 
 ### Research Papers
@@ -163,6 +174,8 @@ Comprehensive research collection in [`deliverables/researchs/`](deliverables/re
 - Advanced signal processing in wearable sensors
 - Health monitoring technologies
 - Machine learning applications in wellness
+- MLOps and deployment strategies
+- Natural language processing for health applications
 
 ---
 
@@ -182,6 +195,8 @@ We welcome contributions from developers, researchers, and privacy advocates!
 - Privacy engineering and security
 - User experience and interface design
 - Documentation and tutorials
+- MLOps and deployment automation
+- Natural language processing
 
 ---
 
