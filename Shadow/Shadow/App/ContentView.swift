@@ -3,6 +3,7 @@ import CoreData
 
 struct ContentView: View {
     @StateObject private var authVM = AuthViewModel()
+    @StateObject private var bleManager = BLEManager()
     @State private var showingProfilePage = false
 
     var body: some View {
@@ -20,6 +21,18 @@ struct ContentView: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
+                    // AppNavBar: Only show when user is logged in
+                    if let profile = authVM.profile, authVM.isLoggedIn {
+                        AppNavBar(
+                            title: "Shadow",
+                            subtitle: "TinyML Stress Detection",
+                            profile: profile,
+                            onProfileTap: { showingProfilePage = true },
+                            onLogout: handleLogout,
+                            showProfileMenu: true,
+                            bleManager: bleManager // Pass BLE manager for status/actions
+                        )
+                    }
                     // Main content
                     Group {
                         content

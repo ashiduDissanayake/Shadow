@@ -39,16 +39,6 @@ struct DashboardView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // AppNavBar replaces the custom nav code!
-                    AppNavBar(
-                        title: "Shadow",
-                        subtitle: "Health Dashboard",
-                        profile: profile,
-                        onProfileTap: { onShowProfile() },
-                        onLogout: { onLogout() },
-                        showProfileMenu: true
-                    )
-
                     if showingSearch {
                         searchBar
                     }
