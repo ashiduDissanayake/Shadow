@@ -3,6 +3,7 @@ import CoreData
 
 struct ContentView: View {
     @StateObject private var authVM = AuthViewModel()
+    @StateObject var calendarViewModel = CalendarViewModel()
     @StateObject private var bleManager = BLEManager()
     @State private var showingProfilePage = false
     @State private var showingCalendar = false // <-- Add this line
@@ -43,7 +44,12 @@ struct ContentView: View {
             }
             // Present your calendar view as a sheet or via navigation.
             .sheet(isPresented: $showingCalendar) {
-                CalendarMainView()
+                if let profile = authVM.profile {
+                    CalendarMainView(viewModel: calendarViewModel, showingCalendar: $showingCalendar)
+                        .onAppear {
+                            calendarViewModel.setProfile(profile)
+                        }
+                }
             }
         }
     }

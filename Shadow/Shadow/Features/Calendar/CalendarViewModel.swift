@@ -1,123 +1,43 @@
-
-//
-//  CalendarViewModel.swift
-//  Shadow
-//
-//  Created by Ashidu Dissanayake on 2025-08-25.
-//
-
-import EventKit
 import Foundation
 import SwiftUI
 
-@MainActor
-final class CalendarViewModel: ObservableObject {
-    @Published var calendars: [EKCalendar] = []
-    @Published var events: [EKEvent] = []
-    @Published var selectedCalendar: EKCalendar?
-    @Published var hasPermission = false
-    @Published var isLoading = false
+class CalendarViewModel: ObservableObject {
+    @Published var selectedDate: Date = Date()
+    @Published var selectedEventType: String = "All"
+    @Published var events: [Event] = []
     @Published var errorMessage: String?
-    
-    private let calendarManager = CalendarManager.shared
-    
-    init() {
-        checkPermissionStatus()
+    @Published var profile: UserProfile?
+
+    private let eventRepo = EventRepository.shared
+
+    func setProfile(_ profile: UserProfile?) {
+        self.profile = profile
+        loadEvents()
     }
-    
-    // MARK: - Permissions
-    
-    private func checkPermissionStatus() {
-        let status = EKEventStore.authorizationStatus(for: .event)
-        hasPermission = status == .authorized
-        
-        if hasPermission {
-            loadCalendars()
-        }
-    }
-    
-    func requestAccess() {
-        isLoading = true
-        calendarManager.requestAccess { [weak self] granted in
-            self?.hasPermission = granted
-            self?.isLoading = false
-            
-            if granted {
-                self?.loadCalendars()
-            } else {
-                self?.errorMessage = "Calendar access denied. Please enable in System Preferences > Security & Privacy > Privacy > Calendars."
-            }
-        }
-    }
-    
-    // MARK: - Data Loading
-    
-    func loadCalendars() {
-        calendars = calendarManager.fetchCalendars()
-        
-        // Auto-select the first writable calendar
-        selectedCalendar = calendars.first { $0.allowsContentModifications }
-        
-        if selectedCalendar != nil {
-            loadEvents()
-        }
-    }
-    
+
     func loadEvents() {
-        guard let calendar = selectedCalendar else { return }
-        
-        isLoading = true
-        events = calendarManager.fetchUpcomingEvents(calendar: calendar, days: 30)
-        isLoading = false
+        guard let profile = profile else { events = []; return }
+        events = eventRepo.fetchEvents(for: profile)
     }
-    
-    // MARK: - Event Management
-    
-    func addTestEvent() {
-        guard let calendar = selectedCalendar else { return }
-        
-        let now = Date()
-        let endDate = Calendar.current.date(byAdding: .hour, value: 1, to: now) ?? now
-        
-        do {
-            try calendarManager.createEvent(
-                title: "Shadow Test Event",
-                notes: "Created from Shadow app - Stress monitoring session",
-                startDate: now,
-                endDate: endDate,
-                calendar: calendar
-            )
-            loadEvents() // Refresh the list
-        } catch {
-            errorMessage = "Failed to create event: \(error.localizedDescription)"
-        }
+
+    var filteredEvents: [Event] {
+        eventRepo.fetchEvents(for: profile, on: selectedDate, type: selectedEventType)
     }
-    
-    func addCustomEvent(title: String, notes: String?, startDate: Date, duration: TimeInterval) {
-        guard let calendar = selectedCalendar else { return }
-        
-        let endDate = startDate.addingTimeInterval(duration)
-        
-        do {
-            try calendarManager.createEvent(
-                title: title,
-                notes: notes,
-                startDate: startDate,
-                endDate: endDate,
-                calendar: calendar
-            )
-            loadEvents()
-        } catch {
-            errorMessage = "Failed to create event: \(error.localizedDescription)"
-        }
+
+    func addEvent(title: String, notes: String?, date: Date, duration: Double, eventType: String, customField: String?) {
+        guard let profile = profile else { return }
+        eventRepo.addEvent(for: profile, title: title, notes: notes, date: date, duration: duration, eventType: eventType, customField: customField)
+        loadEvents()
     }
-    
-    func deleteEvent(_ event: EKEvent) {
-        do {
-            try calendarManager.deleteEvent(event)
-            loadEvents() // Refresh the list
-        } catch {
-            errorMessage = "Failed to delete event: \(error.localizedDescription)"
-        }
+
+    func deleteEvent(_ event: Event) {
+        eventRepo.deleteEvent(event)
+        loadEvents()
+    }
+
+    func deleteAllEventsForCurrentProfile() {
+        guard let profile = profile else { return }
+        eventRepo.deleteAllEvents(for: profile)
+        loadEvents()
     }
 }

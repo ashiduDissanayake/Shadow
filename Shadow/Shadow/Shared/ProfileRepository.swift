@@ -11,7 +11,7 @@ import Foundation
 
 class ProfileRepository {
     static let shared = ProfileRepository()
-    private let container: NSPersistentContainer
+    let container: NSPersistentContainer
 
     private init() {
         container = NSPersistentContainer(name: "AppModel")
