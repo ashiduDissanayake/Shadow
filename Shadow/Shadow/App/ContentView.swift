@@ -5,6 +5,7 @@ struct ContentView: View {
     @StateObject private var authVM = AuthViewModel()
     @StateObject private var bleManager = BLEManager()
     @State private var showingProfilePage = false
+    @State private var showingCalendar = false // <-- Add this line
 
     var body: some View {
         NavigationStack {
@@ -30,6 +31,7 @@ struct ContentView: View {
                             onProfileTap: { showingProfilePage = true },
                             onLogout: handleLogout,
                             showProfileMenu: true,
+                            onCalendarTap: { showingCalendar = true }, // <-- Pass closure here
                             bleManager: bleManager // Pass BLE manager for status/actions
                         )
                     }
@@ -38,6 +40,10 @@ struct ContentView: View {
                         content
                     }
                 }
+            }
+            // Present your calendar view as a sheet or via navigation.
+            .sheet(isPresented: $showingCalendar) {
+                CalendarMainView()
             }
         }
     }

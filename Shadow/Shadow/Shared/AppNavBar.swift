@@ -14,6 +14,7 @@ struct AppNavBar: View {
     let onProfileTap: () -> Void
     let onLogout: (() -> Void)?
     let showProfileMenu: Bool
+    let onCalendarTap: (() -> Void)? // <-- Added
 
     @State private var isHoveringProfile = false
     @State private var showBLEPopover = false
@@ -58,6 +59,20 @@ struct AppNavBar: View {
             }
             
             Spacer()
+
+            // Calendar Button
+            if let onCalendarTap = onCalendarTap {
+                Button(action: { onCalendarTap() }) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.white.opacity(0.12))
+                        .cornerRadius(12)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.trailing, 10)
+            }
 
             // BLE Status Icon & Popover
             Button(action: {
