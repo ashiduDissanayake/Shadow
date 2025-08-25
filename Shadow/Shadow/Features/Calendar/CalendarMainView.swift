@@ -1,501 +1,388 @@
-//
-//  CalendarMainView.swift (macOS Optimized)
-//  Shadow
-//
-//  Created by Ashidu Dissanayake on 2025-08-25.
-//
-
 import SwiftUI
-import EventKit
 
 struct CalendarMainView: View {
-    @StateObject private var viewModel = CalendarViewModel()
-    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var viewModel: CalendarViewModel
+    @Binding var showingCalendar: Bool     // <-- Now a binding!
     @State private var showingAddEvent = false
-    
+
+    private let eventTypes = ["All", "Work", "Birthday", "Custom"]
+
     var body: some View {
         ZStack {
-            // Background gradient matching your app theme
+            // The background (gradient)
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(red: 0.05, green: 0.08, blue: 0.15),
-                    Color(red: 0.1, green: 0.15, blue: 0.25)
+                    Color(red: 0.02, green: 0.05, blue: 0.12),
+                    Color(red: 0.08, green: 0.12, blue: 0.22),
+                    Color(red: 0.05, green: 0.08, blue: 0.18)
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Header with macOS-style controls
-                headerView
-                
-                if viewModel.hasPermission {
-                    authorizedContentView
-                } else {
-                    unauthorizedView
+
+            if showingCalendar {
+                // Dismissal overlay - covers entire background
+                Color.clear
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.28)) {
+                            showingCalendar = false
+                        }
+                    }
+
+                // Main Calendar UI Container
+                VStack(spacing: 0) {
+                    headerView
+                    
+                    // Main content area with proper spacing and sizing
+                    HStack(alignment: .top, spacing: 2) {
+                        // Left sidebar - Event types and stats
+                        sidebarView
+                            .frame(width: 260)
+                        
+                        // Center calendar view
+                        CustomCalendarView(
+                            selectedDate: $viewModel.selectedDate,
+                            events: viewModel.events
+                        )
+                        .frame(width: 450, height: 300)
+                        
+                        // Right sidebar - Events list
+                        eventsSidebar
+                            .frame(width: 300)
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 32)
                 }
-            }
-        }
-        .frame(minWidth: 600, minHeight: 500)
-        .sheet(isPresented: $showingAddEvent) {
-            AddEventView { title, notes, date, duration in
-                viewModel.addCustomEvent(
-                    title: title,
-                    notes: notes,
-                    startDate: date,
-                    duration: duration
+                .frame(maxWidth: 1100, maxHeight: 800)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.3)
                 )
-            }
-        }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let error = viewModel.errorMessage {
-                Text(error)
+                .background(
+                    // Invisible tap blocker
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { /* Prevents background tap from propagating */ }
+                )
+                .sheet(isPresented: $showingAddEvent) {
+                    AddEventView(eventTypes: Array(eventTypes.dropFirst())) { title, notes, date, duration, eventType, customField in
+                        viewModel.addEvent(
+                            title: title,
+                            notes: notes,
+                            date: date,
+                            duration: duration,
+                            eventType: eventType,
+                            customField: customField
+                        )
+                    }
+                }
+                .zIndex(1)
             }
         }
     }
-    
-    // MARK: - View Components
     
     private var headerView: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Calendar Integration")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Text("Manage your stress monitoring sessions")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            
-            Spacer()
-            
-            // macOS-style close button
-            Button(action: { dismiss() }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.white.opacity(0.6))
-                    .background(Circle().fill(.black.opacity(0.2)))
+            // Back button when calendar is open
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.28)) {
+                    showingCalendar = false
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .medium))
+                }
+                .foregroundColor(.white.opacity(0.85))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.10))
+                )
             }
             .buttonStyle(.borderless)
-            .help("Close Calendar")
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 20)
-    }
-    
-    private var authorizedContentView: some View {
-        HStack(spacing: 24) {
-            // Left sidebar with calendar selection and controls
-            leftSidebarView
-                .frame(width: 280)
-            
-            // Main content area
-            mainContentView
-                .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 24)
-    }
-    
-    private var leftSidebarView: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Calendar Selector
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "calendar")
-                        .foregroundColor(.blue)
-                        .font(.title2)
-                    Text("Calendars")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-                
-                VStack(spacing: 8) {
-                    ForEach(viewModel.calendars, id: \.calendarIdentifier) { calendar in
-                        Button(action: {
-                            viewModel.selectedCalendar = calendar
-                            viewModel.loadEvents()
-                        }) {
-                            HStack {
-                                Circle()
-                                    .fill(Color(calendar.cgColor))
-                                    .frame(width: 12, height: 12)
-                                
-                                Text(calendar.title)
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .multilineTextAlignment(.leading)
-                                
-                                Spacer()
-                                
-                                if viewModel.selectedCalendar?.calendarIdentifier == calendar.calendarIdentifier {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.blue)
-                                        .font(.caption)
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(viewModel.selectedCalendar?.calendarIdentifier == calendar.calendarIdentifier ?
-                                          .blue.opacity(0.2) : .white.opacity(0.05))
-                                    .stroke(viewModel.selectedCalendar?.calendarIdentifier == calendar.calendarIdentifier ?
-                                           .blue.opacity(0.4) : .clear, lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.borderless)
-                    }
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.white.opacity(0.05))
-                    .stroke(.white.opacity(0.1), lineWidth: 1)
-            )
-            
-            // Action Buttons
-            VStack(spacing: 12) {
-                Button(action: { showingAddEvent = true }) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("New Event")
-                        Spacer()
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.blue.opacity(0.6))
-                    )
-                }
-                .buttonStyle(.borderless)
-                
-                Button(action: { viewModel.addTestEvent() }) {
-                    HStack {
-                        Image(systemName: "flask.fill")
-                        Text("Add Test Event")
-                        Spacer()
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.purple.opacity(0.6))
-                    )
-                }
-                .buttonStyle(.borderless)
-                
-                Button(action: { viewModel.loadEvents() }) {
-                    HStack {
-                        Image(systemName: "arrow.clockwise")
-                        Text("Refresh")
-                        Spacer()
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.white.opacity(0.1))
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.borderless)
-            }
-            
-            Spacer()
-        }
-    }
-    
-    private var mainContentView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Events header
-            HStack {
-                Image(systemName: "calendar.badge.clock")
-                    .foregroundColor(.green)
-                    .font(.title2)
-                
-                Text("Upcoming Events")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Text("\(viewModel.events.count) events")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.6))
-            }
-            
-            // Events content
-            if viewModel.isLoading {
-                VStack {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                    Text("Loading events...")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.top, 8)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if viewModel.events.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 48))
-                        .foregroundColor(.white.opacity(0.3))
-                    
-                    Text("No upcoming events")
-                        .font(.title3)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white.opacity(0.7))
-                    
-                    Text("Create your first stress monitoring session")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(viewModel.events, id: \.eventIdentifier) { event in
-                            EventRowView(event: event) {
-                                viewModel.deleteEvent(event)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.white.opacity(0.05))
-                .stroke(.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-    
-    private var unauthorizedView: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "calendar.badge.exclamationmark")
-                .font(.system(size: 80))
-                .foregroundColor(.orange)
-            
-            VStack(spacing: 8) {
-                Text("Calendar Access Required")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Text("Shadow needs access to your calendar to help you schedule and track stress monitoring sessions.")
-                    .font(.body)
-                    .foregroundColor(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            
-            if viewModel.isLoading {
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                    Text("Requesting permission...")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            } else {
-                VStack(spacing: 16) {
-                    Button(action: { viewModel.requestAccess() }) {
-                        Text("Grant Calendar Access")
-                            .font(.headline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 32)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(.blue.opacity(0.7))
-                            )
-                    }
-                    .buttonStyle(.borderless)
-                    
-                    Text("You can also enable this in System Preferences > Security & Privacy > Privacy > Calendars")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 60)
-                }
-            }
-        }
-        .padding(60)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
+            .padding(.trailing, 8)
 
-// MARK: - Supporting Views
-
-struct EventRowView: View {
-    let event: EKEvent
-    let onDelete: () -> Void
-    @State private var isHovered = false
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            // Event indicator
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color(event.calendar.cgColor))
-                .frame(width: 6, height: 60)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text(event.title ?? "Untitled Event")
-                    .font(.headline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Calendar")
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.85)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                 
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
+                if let user = viewModel.profile {
+                    HStack(spacing: 10) {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.8), .purple.opacity(0.6)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 8, height: 8)
                         
-                        Text(event.startDate, style: .date)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                        Text("Welcome back, \(user.name ?? "User")")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
                     }
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                        
-                        Text(event.startDate, style: .time)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
-                
-                if let notes = event.notes, !notes.isEmpty {
-                    Text(notes)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                        .lineLimit(2)
-                        .padding(.top, 2)
                 }
             }
             
             Spacer()
             
-            if isHovered {
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.subheadline)
-                        .foregroundColor(.red)
-                        .padding(8)
-                        .background(Circle().fill(.red.opacity(0.15)))
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingAddEvent = true
                 }
-                .buttonStyle(.borderless)
-                .help("Delete Event")
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("New Event")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.blue.opacity(0.85),
+                            Color.purple.opacity(0.75)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(Capsule())
+                .shadow(color: .blue.opacity(0.4), radius: 10, x: 0, y: 5)
             }
+            .buttonStyle(.borderless)
+            .scaleEffect(showingAddEvent ? 0.95 : 1.0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isHovered ? .white.opacity(0.08) : .white.opacity(0.04))
-                .stroke(.white.opacity(isHovered ? 0.15 : 0.08), lineWidth: 1)
-        )
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovered = hovering
-            }
-        }
+        .padding(.horizontal, 32)
+        .padding(.top, 32)
+        .padding(.bottom, 28)
     }
-}
 
-struct AddEventView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var notes = ""
-    @State private var selectedDate = Date()
-    @State private var duration: TimeInterval = 3600 // 1 hour
     
-    let onAdd: (String, String?, Date, TimeInterval) -> Void
+    private var sidebarView: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            // Event Type Filter
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Event Types")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                VStack(spacing: 6) {
+                    ForEach(eventTypes, id: \.self) { type in
+                        eventTypeButton(type: type)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Quick Stats
+            quickStatsView
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.white.opacity(0.08))
+                .stroke(.white.opacity(0.15), lineWidth: 1)
+                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+        )
+    }
     
-    var body: some View {
-        VStack(spacing: 0) {
+    private var eventsSidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
-                Text("New Event")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Events")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                    Text(viewModel.selectedDate, formatter: dayFormatter)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                Spacer()
+                let eventCount = viewModel.filteredEvents.count
+                if eventCount > 0 {
+                    Text("\(eventCount)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(.blue.opacity(0.7))
+                        )
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            Divider()
+                .background(.white.opacity(0.2))
+                .padding(.horizontal, 20)
+
+            // Events scroll view
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if viewModel.filteredEvents.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "calendar.badge.exclamationmark")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white.opacity(0.4))
+                            VStack(spacing: 6) {
+                                Text("No events scheduled")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                                Text("for this day")
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else {
+                        ForEach(viewModel.filteredEvents, id: \.id) { event in
+                            EventRowView(event: event) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    viewModel.deleteEvent(event)
+                                }
+                            }
+                            .padding(.horizontal, 4)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+            }
+            .frame(maxHeight: 500)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.white.opacity(0.08))
+                .stroke(.white.opacity(0.15), lineWidth: 1)
+                .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 8)
+        )
+    }
+
+    private var dayFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateStyle = .full
+        return f
+    }
+    
+    private func eventTypeButton(type: String) -> some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.selectedEventType = type
+            }
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: iconForEventType(type))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(viewModel.selectedEventType == type ? .white : .white.opacity(0.6))
+                    .frame(width: 20)
+                
+                Text(type)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(viewModel.selectedEventType == type ? .white : .white.opacity(0.7))
                 
                 Spacer()
                 
-                HStack(spacing: 12) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .buttonStyle(.borderless)
-                    
-                    Button("Add Event") {
-                        onAdd(title, notes.isEmpty ? nil : notes, selectedDate, duration)
-                        dismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(title.isEmpty)
+                if viewModel.selectedEventType == type {
+                    Circle()
+                        .fill(.blue)
+                        .frame(width: 6, height: 6)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(viewModel.selectedEventType == type ? .white.opacity(0.12) : Color.clear)
+                    .stroke(viewModel.selectedEventType == type ? .white.opacity(0.25) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.borderless)
+    }
+    
+    private func iconForEventType(_ type: String) -> String {
+        switch type {
+        case "All": return "calendar"
+        case "Work": return "briefcase"
+        case "Birthday": return "gift"
+        case "Custom": return "star"
+        default: return "calendar"
+        }
+    }
+    
+    private var quickStatsView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Today's Overview")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white.opacity(0.9))
             
-            Divider()
-            
-            // Form content
-            Form {
-                Section("Event Details") {
-                    TextField("Event Title", text: $title)
-                        .textFieldStyle(.roundedBorder)
-                    
-                    TextField("Notes (Optional)", text: $notes, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(3...6)
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Events today")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(todaysEventCount)")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.blue)
                 }
                 
-                Section("Timing") {
-                    DatePicker("Start Date & Time", selection: $selectedDate)
-                        .datePickerStyle(.compact)
-                    
-                    Picker("Duration", selection: $duration) {
-                        Text("30 minutes").tag(TimeInterval(1800))
-                        Text("1 hour").tag(TimeInterval(3600))
-                        Text("1.5 hours").tag(TimeInterval(5400))
-                        Text("2 hours").tag(TimeInterval(7200))
-                        Text("3 hours").tag(TimeInterval(10800))
-                    }
-                    .pickerStyle(.menu)
+                HStack {
+                    Text("This week")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(thisWeekEventCount)")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.purple)
                 }
             }
-            .formStyle(.grouped)
-            .padding()
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.06))
+                    .stroke(.white.opacity(0.12), lineWidth: 1)
+            )
         }
-        .frame(width: 400, height: 300)
+    }
+    
+    private var todaysEventCount: Int {
+        viewModel.filteredEvents.filter { event in
+            Calendar.current.isDate(event.date ?? Date(), inSameDayAs: Date())
+        }.count
+    }
+    
+    private var thisWeekEventCount: Int {
+        let calendar = Calendar.current
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+        let endOfWeek = calendar.dateInterval(of: .weekOfYear, for: Date())?.end ?? Date()
+        
+        return viewModel.events.filter { event in
+            guard let eventDate = event.date else { return false }
+            return eventDate >= startOfWeek && eventDate <= endOfWeek
+        }.count
     }
 }
