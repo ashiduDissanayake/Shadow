@@ -1,0 +1,49 @@
+{
+  "stage": 2,
+  "description": "Enhanced tree optimization with quantization from retrained model",
+  "timestamp": "2025-08-30T23:16:20.398045",
+  "methodology": "iterative_tree_pruning_with_quantization",
+  "quantization_enabled": true,
+  "baseline_performance": {
+    "accuracy": 0.605,
+    "f1_score": 0.5906735751295337,
+    "precision": 0.6129032258064516,
+    "recall": 0.57
+  },
+  "optimal_configuration": {
+    "n_trees": 20,
+    "strategy": "random_diverse",
+    "selected_trees": [
+      "0",
+      "4",
+      "10",
+      "12",
+      "18",
+      "22",
+      "30",
+      "31",
+      "33",
+      "39",
+      "44",
+      "45",
+      "53",
+      "70",
+      "73",
+      "76",
+      "77",
+      "80",
+      "83",
+      "90"
+    ],
+    "performance": {
+      "accuracy": 0.43,
+      "f1_score": 0.5985915492957746,
+      "precision": 0.46195652173913043,
+      "recall": 0.85
+    },
+    "f1_retention": 1.0134049913516185,
+    "memory_estimate_kb": 63.826,
+    "quantization_applied": true
+  },
+  "validation_status": "ENHANCED_QUANTIZED_COMPLETE"
+}

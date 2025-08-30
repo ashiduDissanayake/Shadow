@@ -1,0 +1,48 @@
+{
+  "stage": 2,
+  "description": "Enhanced tree optimization from retrained model (no fake quantization)",
+  "timestamp": "2025-08-30T23:47:11.216149",
+  "methodology": "iterative_tree_pruning",
+  "baseline_performance": {
+    "accuracy": 0.925,
+    "f1_score": 0.927536231884058,
+    "precision": 0.897196261682243,
+    "recall": 0.96
+  },
+  "optimal_configuration": {
+    "n_trees": 20,
+    "strategy": "performance_based",
+    "selected_trees": [
+      0,
+      5,
+      10,
+      15,
+      20,
+      25,
+      30,
+      35,
+      40,
+      45,
+      50,
+      55,
+      60,
+      65,
+      70,
+      75,
+      80,
+      85,
+      90,
+      95
+    ],
+    "performance": {
+      "accuracy": 0.91,
+      "f1_score": 0.912621359223301,
+      "precision": 0.8867924528301887,
+      "recall": 0.94
+    },
+    "f1_retention": 0.9839199029126214,
+    "memory_estimate_kb": 110.14
+  },
+  "validation_status": "ENHANCED_OPTIMIZATION_COMPLETE",
+  "notes": "No fake quantization applied - real quantization in Stage 3"
+}

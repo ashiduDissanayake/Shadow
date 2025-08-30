@@ -1,0 +1,873 @@
+{
+  "stage": 1,
+  "description": "Feature selection for ESP32-S3",
+  "timestamp": "2025-08-30T15:27:10",
+  "original_model": {
+    "n_trees": 100,
+    "n_features": 73,
+    "optimal_threshold": 0.18955244755244757,
+    "max_depth": null,
+    "feature_names": [
+      "bvp_BVP_mean",
+      "bvp_BVP_std",
+      "bvp_BVP_skewness",
+      "bvp_BVP_kurtosis",
+      "bvp_BVP_peaks",
+      "bvp_BVP_n_above_mean",
+      "bvp_BVP_n_below_mean",
+      "bvp_BVP_n_sign_changes",
+      "bvp_BVP_perm_entropy",
+      "bvp_BVP_svd_entropy",
+      "bvp_l2_min",
+      "bvp_l2_n_above_mean",
+      "bvp_l2_n_below_mean",
+      "bvp_l2_n_sign_changes",
+      "bvp_l2_perm_entropy",
+      "acc_x_mean",
+      "acc_x_std",
+      "acc_x_energy",
+      "acc_x_skewness",
+      "acc_x_kurtosis",
+      "acc_x_peaks",
+      "acc_x_lineintegral",
+      "acc_x_n_above_mean",
+      "acc_x_n_sign_changes",
+      "acc_x_iqr",
+      "acc_y_mean",
+      "acc_y_std",
+      "acc_y_max",
+      "acc_y_energy",
+      "acc_y_skewness",
+      "acc_y_kurtosis",
+      "acc_y_peaks",
+      "acc_y_n_above_mean",
+      "acc_y_n_sign_changes",
+      "acc_y_iqr",
+      "acc_y_svd_entropy",
+      "acc_z_mean",
+      "acc_z_std",
+      "acc_z_min",
+      "acc_z_max",
+      "acc_z_energy",
+      "acc_z_skewness",
+      "acc_z_kurtosis",
+      "acc_z_peaks",
+      "acc_z_n_above_mean",
+      "acc_z_n_sign_changes",
+      "acc_z_svd_entropy",
+      "acc_l2_skewness",
+      "acc_l2_kurtosis",
+      "acc_l2_n_above_mean",
+      "acc_l2_n_below_mean",
+      "eda_EDA_mean",
+      "eda_EDA_std",
+      "eda_EDA_skewness",
+      "eda_EDA_kurtosis",
+      "eda_EDA_peaks",
+      "eda_EDA_lineintegral",
+      "eda_EDA_n_above_mean",
+      "eda_EDA_n_below_mean",
+      "eda_EDA_iqr",
+      "eda_EDA_perm_entropy",
+      "eda_EDA_svd_entropy",
+      "temp_TEMP_mean",
+      "temp_TEMP_std",
+      "temp_TEMP_skewness",
+      "temp_TEMP_kurtosis",
+      "temp_TEMP_lineintegral",
+      "temp_TEMP_n_above_mean",
+      "temp_TEMP_n_below_mean",
+      "temp_TEMP_iqr",
+      "temp_TEMP_perm_entropy",
+      "temp_TEMP_svd_entropy",
+      "temp_l2_svd_entropy"
+    ]
+  },
+  "feature_analysis": {
+    "sensor_groups": {
+      "bvp": [
+        {
+          "index": 8,
+          "name": "bvp_BVP_perm_entropy",
+          "importance": 0.13415661136017423
+        },
+        {
+          "index": 7,
+          "name": "bvp_BVP_n_sign_changes",
+          "importance": 0.07228684143910859
+        },
+        {
+          "index": 5,
+          "name": "bvp_BVP_n_above_mean",
+          "importance": 0.018308718227334667
+        },
+        {
+          "index": 4,
+          "name": "bvp_BVP_peaks",
+          "importance": 0.015972396467292344
+        },
+        {
+          "index": 11,
+          "name": "bvp_l2_n_above_mean",
+          "importance": 0.012220350857177016
+        },
+        {
+          "index": 1,
+          "name": "bvp_BVP_std",
+          "importance": 0.010102036171536526
+        },
+        {
+          "index": 9,
+          "name": "bvp_BVP_svd_entropy",
+          "importance": 0.00893825370933081
+        },
+        {
+          "index": 6,
+          "name": "bvp_BVP_n_below_mean",
+          "importance": 0.00889917193206766
+        },
+        {
+          "index": 14,
+          "name": "bvp_l2_perm_entropy",
+          "importance": 0.008643402067100854
+        },
+        {
+          "index": 12,
+          "name": "bvp_l2_n_below_mean",
+          "importance": 0.005259864550062519
+        },
+        {
+          "index": 3,
+          "name": "bvp_BVP_kurtosis",
+          "importance": 0.0022672920268010086
+        },
+        {
+          "index": 10,
+          "name": "bvp_l2_min",
+          "importance": 0.0022110048347928875
+        },
+        {
+          "index": 13,
+          "name": "bvp_l2_n_sign_changes",
+          "importance": 0.0018213227419190989
+        },
+        {
+          "index": 2,
+          "name": "bvp_BVP_skewness",
+          "importance": 0.0009137228691723061
+        },
+        {
+          "index": 0,
+          "name": "bvp_BVP_mean",
+          "importance": 0.00016380066694775074
+        }
+      ],
+      "acc": [
+        {
+          "index": 43,
+          "name": "acc_z_peaks",
+          "importance": 0.051819183546761016
+        },
+        {
+          "index": 31,
+          "name": "acc_y_peaks",
+          "importance": 0.04649714659214622
+        },
+        {
+          "index": 20,
+          "name": "acc_x_peaks",
+          "importance": 0.030863826294678372
+        },
+        {
+          "index": 46,
+          "name": "acc_z_svd_entropy",
+          "importance": 0.02663800245092409
+        },
+        {
+          "index": 15,
+          "name": "acc_x_mean",
+          "importance": 0.02591126999195935
+        },
+        {
+          "index": 28,
+          "name": "acc_y_energy",
+          "importance": 0.024327802432157646
+        },
+        {
+          "index": 25,
+          "name": "acc_y_mean",
+          "importance": 0.020216746032761322
+        },
+        {
+          "index": 36,
+          "name": "acc_z_mean",
+          "importance": 0.01682810363385638
+        },
+        {
+          "index": 21,
+          "name": "acc_x_lineintegral",
+          "importance": 0.012095686001473151
+        },
+        {
+          "index": 38,
+          "name": "acc_z_min",
+          "importance": 0.011744995875735546
+        },
+        {
+          "index": 27,
+          "name": "acc_y_max",
+          "importance": 0.010855298027291653
+        },
+        {
+          "index": 40,
+          "name": "acc_z_energy",
+          "importance": 0.01082607789397452
+        },
+        {
+          "index": 17,
+          "name": "acc_x_energy",
+          "importance": 0.009461320496441031
+        },
+        {
+          "index": 37,
+          "name": "acc_z_std",
+          "importance": 0.008700781964214121
+        },
+        {
+          "index": 35,
+          "name": "acc_y_svd_entropy",
+          "importance": 0.006898907833186374
+        },
+        {
+          "index": 39,
+          "name": "acc_z_max",
+          "importance": 0.0064560622586011815
+        },
+        {
+          "index": 16,
+          "name": "acc_x_std",
+          "importance": 0.005538535559887913
+        },
+        {
+          "index": 26,
+          "name": "acc_y_std",
+          "importance": 0.004496756606304481
+        },
+        {
+          "index": 45,
+          "name": "acc_z_n_sign_changes",
+          "importance": 0.003114567944279792
+        },
+        {
+          "index": 34,
+          "name": "acc_y_iqr",
+          "importance": 0.0029045359988784515
+        },
+        {
+          "index": 24,
+          "name": "acc_x_iqr",
+          "importance": 0.002541654403763916
+        },
+        {
+          "index": 33,
+          "name": "acc_y_n_sign_changes",
+          "importance": 0.0021235362254521115
+        },
+        {
+          "index": 23,
+          "name": "acc_x_n_sign_changes",
+          "importance": 0.0019339130021319337
+        },
+        {
+          "index": 49,
+          "name": "acc_l2_n_above_mean",
+          "importance": 0.0015655719829303027
+        },
+        {
+          "index": 48,
+          "name": "acc_l2_kurtosis",
+          "importance": 0.0015295767145395351
+        },
+        {
+          "index": 30,
+          "name": "acc_y_kurtosis",
+          "importance": 0.0014726566771709353
+        },
+        {
+          "index": 50,
+          "name": "acc_l2_n_below_mean",
+          "importance": 0.0012932534444529138
+        },
+        {
+          "index": 47,
+          "name": "acc_l2_skewness",
+          "importance": 0.0012657839337912003
+        },
+        {
+          "index": 19,
+          "name": "acc_x_kurtosis",
+          "importance": 0.0012605362319485312
+        },
+        {
+          "index": 29,
+          "name": "acc_y_skewness",
+          "importance": 0.001073996282767186
+        },
+        {
+          "index": 18,
+          "name": "acc_x_skewness",
+          "importance": 0.0010653426617654026
+        },
+        {
+          "index": 42,
+          "name": "acc_z_kurtosis",
+          "importance": 0.001036358937371409
+        },
+        {
+          "index": 41,
+          "name": "acc_z_skewness",
+          "importance": 0.0008365036601768016
+        },
+        {
+          "index": 32,
+          "name": "acc_y_n_above_mean",
+          "importance": 0.0007251842857435162
+        },
+        {
+          "index": 22,
+          "name": "acc_x_n_above_mean",
+          "importance": 0.0006869277692180358
+        },
+        {
+          "index": 44,
+          "name": "acc_z_n_above_mean",
+          "importance": 0.0005264635135240877
+        }
+      ],
+      "eda": [
+        {
+          "index": 51,
+          "name": "eda_EDA_mean",
+          "importance": 0.08358915140018168
+        },
+        {
+          "index": 52,
+          "name": "eda_EDA_std",
+          "importance": 0.027582397744504952
+        },
+        {
+          "index": 56,
+          "name": "eda_EDA_lineintegral",
+          "importance": 0.025814582048396616
+        },
+        {
+          "index": 59,
+          "name": "eda_EDA_iqr",
+          "importance": 0.023506060340038618
+        },
+        {
+          "index": 60,
+          "name": "eda_EDA_perm_entropy",
+          "importance": 0.005471358328869542
+        },
+        {
+          "index": 61,
+          "name": "eda_EDA_svd_entropy",
+          "importance": 0.0049976710914982105
+        },
+        {
+          "index": 57,
+          "name": "eda_EDA_n_above_mean",
+          "importance": 0.0021971763630848286
+        },
+        {
+          "index": 53,
+          "name": "eda_EDA_skewness",
+          "importance": 0.0014540109977126498
+        },
+        {
+          "index": 55,
+          "name": "eda_EDA_peaks",
+          "importance": 0.0014492404347989116
+        },
+        {
+          "index": 54,
+          "name": "eda_EDA_kurtosis",
+          "importance": 0.0013462053482061565
+        },
+        {
+          "index": 58,
+          "name": "eda_EDA_n_below_mean",
+          "importance": 0.0009806424797043052
+        }
+      ],
+      "temp": [
+        {
+          "index": 62,
+          "name": "temp_TEMP_mean",
+          "importance": 0.14776565511872586
+        },
+        {
+          "index": 63,
+          "name": "temp_TEMP_std",
+          "importance": 0.005007439202415907
+        },
+        {
+          "index": 70,
+          "name": "temp_TEMP_perm_entropy",
+          "importance": 0.002112904267563224
+        },
+        {
+          "index": 66,
+          "name": "temp_TEMP_lineintegral",
+          "importance": 0.0020497719357439478
+        },
+        {
+          "index": 69,
+          "name": "temp_TEMP_iqr",
+          "importance": 0.0012426205895991367
+        },
+        {
+          "index": 71,
+          "name": "temp_TEMP_svd_entropy",
+          "importance": 0.0011695781764754624
+        },
+        {
+          "index": 72,
+          "name": "temp_l2_svd_entropy",
+          "importance": 0.001039785973854515
+        },
+        {
+          "index": 64,
+          "name": "temp_TEMP_skewness",
+          "importance": 0.0006021411830425867
+        },
+        {
+          "index": 67,
+          "name": "temp_TEMP_n_above_mean",
+          "importance": 0.0005950973367202037
+        },
+        {
+          "index": 65,
+          "name": "temp_TEMP_kurtosis",
+          "importance": 0.0004752862312532505
+        },
+        {
+          "index": 68,
+          "name": "temp_TEMP_n_below_mean",
+          "importance": 0.00025356632453073984
+        }
+      ]
+    },
+    "sensor_totals": {
+      "bvp": 0.30216478992081824,
+      "acc": 0.35713286716226034,
+      "eda": 0.17838849657699649,
+      "temp": 0.16231384633992485
+    },
+    "top_features": [
+      {
+        "index": 62,
+        "name": "temp_TEMP_mean",
+        "importance": 0.14776565511872586
+      },
+      {
+        "index": 8,
+        "name": "bvp_BVP_perm_entropy",
+        "importance": 0.13415661136017423
+      },
+      {
+        "index": 51,
+        "name": "eda_EDA_mean",
+        "importance": 0.08358915140018168
+      },
+      {
+        "index": 7,
+        "name": "bvp_BVP_n_sign_changes",
+        "importance": 0.07228684143910859
+      },
+      {
+        "index": 43,
+        "name": "acc_z_peaks",
+        "importance": 0.051819183546761016
+      },
+      {
+        "index": 31,
+        "name": "acc_y_peaks",
+        "importance": 0.04649714659214622
+      },
+      {
+        "index": 20,
+        "name": "acc_x_peaks",
+        "importance": 0.030863826294678372
+      },
+      {
+        "index": 52,
+        "name": "eda_EDA_std",
+        "importance": 0.027582397744504952
+      },
+      {
+        "index": 46,
+        "name": "acc_z_svd_entropy",
+        "importance": 0.02663800245092409
+      },
+      {
+        "index": 15,
+        "name": "acc_x_mean",
+        "importance": 0.02591126999195935
+      },
+      {
+        "index": 56,
+        "name": "eda_EDA_lineintegral",
+        "importance": 0.025814582048396616
+      },
+      {
+        "index": 28,
+        "name": "acc_y_energy",
+        "importance": 0.024327802432157646
+      },
+      {
+        "index": 59,
+        "name": "eda_EDA_iqr",
+        "importance": 0.023506060340038618
+      },
+      {
+        "index": 25,
+        "name": "acc_y_mean",
+        "importance": 0.020216746032761322
+      },
+      {
+        "index": 5,
+        "name": "bvp_BVP_n_above_mean",
+        "importance": 0.018308718227334667
+      },
+      {
+        "index": 36,
+        "name": "acc_z_mean",
+        "importance": 0.01682810363385638
+      },
+      {
+        "index": 4,
+        "name": "bvp_BVP_peaks",
+        "importance": 0.015972396467292344
+      },
+      {
+        "index": 11,
+        "name": "bvp_l2_n_above_mean",
+        "importance": 0.012220350857177016
+      },
+      {
+        "index": 21,
+        "name": "acc_x_lineintegral",
+        "importance": 0.012095686001473151
+      },
+      {
+        "index": 38,
+        "name": "acc_z_min",
+        "importance": 0.011744995875735546
+      }
+    ]
+  },
+  "optimal_subset": {
+    "n_features": 35,
+    "selected_indices": [
+      62,
+      8,
+      51,
+      7,
+      43,
+      31,
+      20,
+      52,
+      46,
+      15,
+      56,
+      28,
+      59,
+      25,
+      5,
+      36,
+      4,
+      11,
+      21,
+      38,
+      27,
+      40,
+      1,
+      17,
+      9,
+      6,
+      37,
+      14,
+      35,
+      39,
+      16,
+      60,
+      12,
+      63,
+      61
+    ],
+    "importance_retention": 0.9442017089418664,
+    "feature_reduction": 0.5205479452054794,
+    "memory_reduction": 0.5205479452054794,
+    "processing_speedup": 2.0857142857142854,
+    "score": 1.0483112979829623
+  },
+  "feature_mapping": {
+    "mapping": [
+      {
+        "new_index": 0,
+        "original_index": 62,
+        "name": "temp_TEMP_mean",
+        "importance": 0.14776565511872586,
+        "importance_percent": 14.776565511872587
+      },
+      {
+        "new_index": 1,
+        "original_index": 8,
+        "name": "bvp_BVP_perm_entropy",
+        "importance": 0.13415661136017423,
+        "importance_percent": 13.415661136017423
+      },
+      {
+        "new_index": 2,
+        "original_index": 51,
+        "name": "eda_EDA_mean",
+        "importance": 0.08358915140018168,
+        "importance_percent": 8.358915140018167
+      },
+      {
+        "new_index": 3,
+        "original_index": 7,
+        "name": "bvp_BVP_n_sign_changes",
+        "importance": 0.07228684143910859,
+        "importance_percent": 7.228684143910859
+      },
+      {
+        "new_index": 4,
+        "original_index": 43,
+        "name": "acc_z_peaks",
+        "importance": 0.051819183546761016,
+        "importance_percent": 5.181918354676101
+      },
+      {
+        "new_index": 5,
+        "original_index": 31,
+        "name": "acc_y_peaks",
+        "importance": 0.04649714659214622,
+        "importance_percent": 4.649714659214622
+      },
+      {
+        "new_index": 6,
+        "original_index": 20,
+        "name": "acc_x_peaks",
+        "importance": 0.030863826294678372,
+        "importance_percent": 3.0863826294678374
+      },
+      {
+        "new_index": 7,
+        "original_index": 52,
+        "name": "eda_EDA_std",
+        "importance": 0.027582397744504952,
+        "importance_percent": 2.7582397744504954
+      },
+      {
+        "new_index": 8,
+        "original_index": 46,
+        "name": "acc_z_svd_entropy",
+        "importance": 0.02663800245092409,
+        "importance_percent": 2.663800245092409
+      },
+      {
+        "new_index": 9,
+        "original_index": 15,
+        "name": "acc_x_mean",
+        "importance": 0.02591126999195935,
+        "importance_percent": 2.591126999195935
+      },
+      {
+        "new_index": 10,
+        "original_index": 56,
+        "name": "eda_EDA_lineintegral",
+        "importance": 0.025814582048396616,
+        "importance_percent": 2.5814582048396617
+      },
+      {
+        "new_index": 11,
+        "original_index": 28,
+        "name": "acc_y_energy",
+        "importance": 0.024327802432157646,
+        "importance_percent": 2.4327802432157646
+      },
+      {
+        "new_index": 12,
+        "original_index": 59,
+        "name": "eda_EDA_iqr",
+        "importance": 0.023506060340038618,
+        "importance_percent": 2.350606034003862
+      },
+      {
+        "new_index": 13,
+        "original_index": 25,
+        "name": "acc_y_mean",
+        "importance": 0.020216746032761322,
+        "importance_percent": 2.021674603276132
+      },
+      {
+        "new_index": 14,
+        "original_index": 5,
+        "name": "bvp_BVP_n_above_mean",
+        "importance": 0.018308718227334667,
+        "importance_percent": 1.8308718227334666
+      },
+      {
+        "new_index": 15,
+        "original_index": 36,
+        "name": "acc_z_mean",
+        "importance": 0.01682810363385638,
+        "importance_percent": 1.6828103633856382
+      },
+      {
+        "new_index": 16,
+        "original_index": 4,
+        "name": "bvp_BVP_peaks",
+        "importance": 0.015972396467292344,
+        "importance_percent": 1.5972396467292342
+      },
+      {
+        "new_index": 17,
+        "original_index": 11,
+        "name": "bvp_l2_n_above_mean",
+        "importance": 0.012220350857177016,
+        "importance_percent": 1.2220350857177016
+      },
+      {
+        "new_index": 18,
+        "original_index": 21,
+        "name": "acc_x_lineintegral",
+        "importance": 0.012095686001473151,
+        "importance_percent": 1.2095686001473152
+      },
+      {
+        "new_index": 19,
+        "original_index": 38,
+        "name": "acc_z_min",
+        "importance": 0.011744995875735546,
+        "importance_percent": 1.1744995875735547
+      },
+      {
+        "new_index": 20,
+        "original_index": 27,
+        "name": "acc_y_max",
+        "importance": 0.010855298027291653,
+        "importance_percent": 1.0855298027291653
+      },
+      {
+        "new_index": 21,
+        "original_index": 40,
+        "name": "acc_z_energy",
+        "importance": 0.01082607789397452,
+        "importance_percent": 1.082607789397452
+      },
+      {
+        "new_index": 22,
+        "original_index": 1,
+        "name": "bvp_BVP_std",
+        "importance": 0.010102036171536526,
+        "importance_percent": 1.0102036171536526
+      },
+      {
+        "new_index": 23,
+        "original_index": 17,
+        "name": "acc_x_energy",
+        "importance": 0.009461320496441031,
+        "importance_percent": 0.9461320496441031
+      },
+      {
+        "new_index": 24,
+        "original_index": 9,
+        "name": "bvp_BVP_svd_entropy",
+        "importance": 0.00893825370933081,
+        "importance_percent": 0.893825370933081
+      },
+      {
+        "new_index": 25,
+        "original_index": 6,
+        "name": "bvp_BVP_n_below_mean",
+        "importance": 0.00889917193206766,
+        "importance_percent": 0.889917193206766
+      },
+      {
+        "new_index": 26,
+        "original_index": 37,
+        "name": "acc_z_std",
+        "importance": 0.008700781964214121,
+        "importance_percent": 0.8700781964214122
+      },
+      {
+        "new_index": 27,
+        "original_index": 14,
+        "name": "bvp_l2_perm_entropy",
+        "importance": 0.008643402067100854,
+        "importance_percent": 0.8643402067100854
+      },
+      {
+        "new_index": 28,
+        "original_index": 35,
+        "name": "acc_y_svd_entropy",
+        "importance": 0.006898907833186374,
+        "importance_percent": 0.6898907833186374
+      },
+      {
+        "new_index": 29,
+        "original_index": 39,
+        "name": "acc_z_max",
+        "importance": 0.0064560622586011815,
+        "importance_percent": 0.6456062258601182
+      },
+      {
+        "new_index": 30,
+        "original_index": 16,
+        "name": "acc_x_std",
+        "importance": 0.005538535559887913,
+        "importance_percent": 0.5538535559887913
+      },
+      {
+        "new_index": 31,
+        "original_index": 60,
+        "name": "eda_EDA_perm_entropy",
+        "importance": 0.005471358328869542,
+        "importance_percent": 0.5471358328869542
+      },
+      {
+        "new_index": 32,
+        "original_index": 12,
+        "name": "bvp_l2_n_below_mean",
+        "importance": 0.005259864550062519,
+        "importance_percent": 0.525986455006252
+      },
+      {
+        "new_index": 33,
+        "original_index": 63,
+        "name": "temp_TEMP_std",
+        "importance": 0.005007439202415907,
+        "importance_percent": 0.5007439202415906
+      },
+      {
+        "new_index": 34,
+        "original_index": 61,
+        "name": "eda_EDA_svd_entropy",
+        "importance": 0.0049976710914982105,
+        "importance_percent": 0.49976710914982103
+      }
+    ],
+    "sensor_distribution": {
+      "bvp": 10,
+      "acc": 17,
+      "eda": 6,
+      "temp": 2
+    },
+    "total_selected": 35
+  },
+  "validation_status": "PASSED"
+}

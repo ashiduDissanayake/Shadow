@@ -1,0 +1,90 @@
+{
+  "stage": 2,
+  "description": "Tree optimization for ESP32-S3 deployment",
+  "timestamp": "2025-08-30T21:57:09",
+  "input_summary": {
+    "original_trees": 100,
+    "original_features": 73,
+    "stage1_selected_features": 35,
+    "stage1_importance_retention": 0.9442017089418664
+  },
+  "optimization_results": {
+    "selected_trees": 50,
+    "avg_quality": 0.743883686628953,
+    "memory_reduction": 0.5,
+    "esp32_score": 1.0531391726603707,
+    "overall_reduction_from_original": {
+      "trees": 0.5,
+      "features": 0.5205479452054794,
+      "combined_memory_estimate": 0.7602739726027398
+    }
+  },
+  "selected_tree_details": {
+    "tree_ids": [
+      19,
+      10,
+      60,
+      18,
+      57,
+      30,
+      17,
+      33,
+      43,
+      47,
+      38,
+      31,
+      25,
+      84,
+      34,
+      46,
+      55,
+      70,
+      2,
+      67,
+      79,
+      93,
+      94,
+      73,
+      23,
+      52,
+      54,
+      59,
+      72,
+      98,
+      32,
+      77,
+      66,
+      36,
+      80,
+      75,
+      87,
+      48,
+      5,
+      13,
+      1,
+      92,
+      45,
+      82,
+      24,
+      78,
+      62,
+      64,
+      83,
+      6
+    ],
+    "tree_count": 50,
+    "quality_stats": {
+      "total": 37.19418433144765,
+      "mean": 0.743883686628953,
+      "std": 0.03831133874903515,
+      "min": 0.6974109589041095,
+      "max": 0.8431054989816701
+    }
+  },
+  "esp32_deployment_estimate": {
+    "estimated_memory_kb": 13.671875,
+    "processing_speedup_factor": 2.0,
+    "feature_processing_speedup": 2.085714285714286,
+    "combined_speedup": 4.171428571428572
+  }
+}
