@@ -1,0 +1,38 @@
+{
+  "source_file": "/Users/ashidudissanayake/Dev/Shadow/model-development/data-input/flirt-wesad-acc-bvp-eda-temp-60-10.parquet",
+  "file_hash": "826e1b312933dab3229de9af55323387006b779d06551b2a09ea9cf1705b380a",
+  "load_timestamp": "2025-08-31T12:50:42.744535",
+  "total_samples": 2759,
+  "total_features": 220,
+  "subjects": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    13,
+    14,
+    15,
+    16,
+    17
+  ],
+  "labels": [
+    0,
+    1
+  ],
+  "schema_valid": true,
+  "nan_columns": {},
+  "temporal_analysis": {
+    "window_size_sec": 60,
+    "step_size_sec": 10,
+    "overlap_seconds": 50,
+    "overlap_percent": 83.3,
+    "temporal_leakage_risk": "HIGH",
+    "esp32_realistic": false
+  }
+}

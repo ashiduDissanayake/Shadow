@@ -1,0 +1,154 @@
+{
+  "pipeline": {
+    "name": "ESP32-S3 Rigorous ML Pipeline",
+    "version": "1.0.0",
+    "description": "Rigorous, leak-free ML pipeline for ESP32-S3 stress detection"
+  },
+  "data": {
+    "wesad_path": "/Users/ashidudissanayake/Dev/Shadow/model-development/data-input/",
+    "dataset_options": {
+      "option_1": {
+        "file": "flirt-wesad-acc-bvp-eda-temp-30-1.parquet",
+        "window_size_sec": 30,
+        "step_size_sec": 1,
+        "overlap_percent": 96.7,
+        "temporal_leakage_risk": "HIGH",
+        "recommended": false,
+        "notes": "Severe temporal leakage due to 96.7% overlap"
+      },
+      "option_2": {
+        "file": "flirt-wesad-acc-bvp-eda-temp-60-10.parquet", 
+        "window_size_sec": 60,
+        "step_size_sec": 10,
+        "overlap_percent": 83.3,
+        "temporal_leakage_risk": "MEDIUM",
+        "recommended": true,
+        "notes": "More realistic for ESP32 deployment, less temporal leakage"
+      }
+    },
+    "selected_dataset": "option_2",
+    "validation_strategy": "LOSO",
+    "min_subjects_per_fold": 1,
+    "test_set_subjects": 3
+  },
+  "validation": {
+    "outer_cv": {
+      "method": "LeaveOneSubjectOut",
+      "description": "Each subject used exactly once as test set"
+    },
+    "inner_cv": {
+      "method": "GroupKFold",
+      "n_splits": 3,
+      "description": "Within training subjects, grouped by subject"
+    },
+    "metrics": {
+      "primary": "f1_score",
+      "secondary": ["balanced_accuracy", "mcc", "precision", "recall"],
+      "threshold_tuning": "f1_optimal"
+    },
+    "acceptance_criteria": {
+      "feature_reduction_min": 0.4,
+      "performance_drop_max": 0.02,
+      "variance_inflation_max": 0.1
+    }
+  },
+  "esp32_constraints": {
+    "memory": {
+      "flash_total_mb": 16,
+      "flash_available_mb": 12,
+      "sram_total_kb": 512,
+      "sram_available_kb": 300,
+      "model_budget_kb": 150,
+      "feature_buffer_kb": 20
+    },
+    "performance": {
+      "max_inference_latency_ms": 10,
+      "max_power_consumption_mw": 100,
+      "min_battery_life_hours": 24
+    },
+    "sensors": {
+      "accelerometer": {
+        "sampling_rate_hz": 32,
+        "resolution_bits": 16
+      },
+      "ppg": {
+        "sampling_rate_hz": 64,
+        "resolution_bits": 16
+      },
+      "eda": {
+        "sampling_rate_hz": 4,
+        "resolution_bits": 12
+      },
+      "temperature": {
+        "sampling_rate_hz": 4,
+        "resolution_bits": 12
+      }
+    }
+  },
+  "feature_engineering": {
+    "correlation_threshold": 0.8,
+    "feature_count_targets": [15, 20, 25, 30, 35, 40, 50],
+    "importance_methods": ["permutation", "shap", "impurity"],
+    "normalization": "per_subject_baseline"
+  },
+  "model_exploration": {
+    "candidates": [
+      {
+        "name": "ExtraTreesClassifier",
+        "priority": 1,
+        "esp32_friendly": true,
+        "params": {
+          "n_estimators": [50, 100, 200],
+          "max_depth": [10, 20, null],
+          "min_samples_leaf": [2, 4, 8]
+        }
+      },
+      {
+        "name": "RandomForestClassifier", 
+        "priority": 2,
+        "esp32_friendly": true,
+        "params": {
+          "n_estimators": [50, 100, 200],
+          "max_depth": [10, 20, null],
+          "min_samples_leaf": [2, 4, 8]
+        }
+      },
+      {
+        "name": "LGBMClassifier",
+        "priority": 3,
+        "esp32_friendly": false,
+        "params": {
+          "n_estimators": [50, 100, 200],
+          "max_depth": [10, 20, -1],
+          "min_child_samples": [10, 20, 50]
+        }
+      },
+      {
+        "name": "LogisticRegression",
+        "priority": 4,
+        "esp32_friendly": true,
+        "params": {
+          "C": [0.1, 1.0, 10.0],
+          "penalty": ["l1", "l2"]
+        }
+      }
+    ]
+  },
+  "compression": {
+    "tree_pruning": {
+      "methods": ["estimator_pruning", "threshold_quantization"],
+      "target_reduction": 0.5,
+      "performance_retention": 0.95
+    },
+    "quantization": {
+      "threshold_bits": 16,
+      "leaf_bits": 8,
+      "feature_bits": 16
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "pipeline.log"
+  }
+}

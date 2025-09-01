@@ -1,0 +1,43 @@
+{
+  "config": {
+    "stage0_dir": "../outputs/stage0",
+    "stage1_5_dir": "../outputs/stage1_5_enhanced",
+    "output_dir": "../outputs/stage2_model_exploration",
+    "config_path": "../config/pipeline_config.json",
+    "test_extra_trees": true,
+    "test_random_forest": true,
+    "test_lightgbm": true,
+    "test_xgboost": true,
+    "test_logistic_regression": true,
+    "test_mlp": true,
+    "test_cnn": false,
+    "n_estimators": 200,
+    "max_depth": null,
+    "min_samples_split": 2,
+    "min_samples_leaf": 1,
+    "primary_metric": "f1",
+    "secondary_metrics": [
+      "balanced_accuracy",
+      "mcc",
+      "precision",
+      "recall"
+    ],
+    "size_weight": 0.3,
+    "latency_weight": 0.2,
+    "variance_weight": 0.0,
+    "optimize_threshold": true,
+    "threshold_metric": "f1",
+    "threshold_cv_folds": 3,
+    "threshold_strategy": "inner_cv",
+    "final_calibration": true,
+    "calibration_preference": "isotonic",
+    "max_model_size_mb": 10.0,
+    "max_inference_time_ms": 50.0,
+    "random_state": 42,
+    "save_environment": false,
+    "allow_resume": true
+  },
+  "selected_features_count": 30,
+  "best_model": "mlp",
+  "final_model_saved": true
+}

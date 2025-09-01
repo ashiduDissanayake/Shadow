@@ -1,0 +1,11 @@
+{
+  "ranking": [
+    "mlp",
+    "xgboost",
+    "logistic_regression",
+    "lightgbm",
+    "random_forest",
+    "extra_trees"
+  ],
+  "primary_metric": "f1"
+}

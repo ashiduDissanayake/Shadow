@@ -1,0 +1,25 @@
+{
+  "stage": 0,
+  "description": "Data Integrity & Splitting",
+  "timestamp": "2025-08-31T12:50:42.784684",
+  "status": "SUCCESS",
+  "data_source": "/Users/ashidudissanayake/Dev/Shadow/model-development/data-input/flirt-wesad-acc-bvp-eda-temp-60-10.parquet",
+  "validation_strategy": "LOSO",
+  "total_subjects": 15,
+  "total_samples": 2759,
+  "loso_folds": 15,
+  "temporal_analysis": {
+    "window_size_sec": 60,
+    "step_size_sec": 10,
+    "overlap_seconds": 50,
+    "overlap_percent": 83.3,
+    "temporal_leakage_risk": "HIGH",
+    "esp32_realistic": false
+  },
+  "integrity_validated": true,
+  "artifacts": [
+    "data_manifest.json",
+    "per_subject_stats.json",
+    "fold_definitions.json"
+  ]
+}

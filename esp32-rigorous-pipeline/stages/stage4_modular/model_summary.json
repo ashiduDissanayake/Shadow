@@ -1,0 +1,82 @@
+{
+  "model_info": {
+    "type": "MLPClassifier",
+    "architecture": [
+      64,
+      32
+    ],
+    "n_layers": 4,
+    "total_parameters": 4097
+  },
+  "layer_shapes": [
+    {
+      "layer": 0,
+      "input_size": 30,
+      "output_size": 64,
+      "weights": 1920,
+      "biases": 64
+    },
+    {
+      "layer": 1,
+      "input_size": 64,
+      "output_size": 32,
+      "weights": 2048,
+      "biases": 32
+    },
+    {
+      "layer": 2,
+      "input_size": 32,
+      "output_size": 1,
+      "weights": 32,
+      "biases": 1
+    }
+  ],
+  "scaler_info": {
+    "n_features": 30,
+    "mean_stats": {
+      "min": -30.222181949981877,
+      "max": 1982747.404494382
+    },
+    "scale_stats": {
+      "min": 0.02832819332083632,
+      "max": 1784117.2225175577
+    }
+  },
+  "calibrator_info": {
+    "type": "IsotonicRegression",
+    "n_points": 68
+  },
+  "features": [
+    "bvp_BVP_perm_entropy",
+    "acc_y_perm_entropy",
+    "acc_l2_ptp",
+    "acc_l2_max",
+    "acc_z_peaks",
+    "eda_l2_lineintegral",
+    "acc_l2_peaks",
+    "acc_z_perm_entropy",
+    "acc_y_lineintegral",
+    "eda_EDA_lineintegral",
+    "temp_TEMP_min",
+    "temp_l2_min",
+    "acc_z_rms",
+    "acc_z_min",
+    "acc_z_energy",
+    "acc_z_pct_95",
+    "acc_z_mean",
+    "bvp_l2_iqr",
+    "acc_l2_rms",
+    "eda_l2_iqr_5_95",
+    "acc_y_peaks",
+    "bvp_BVP_n_sign_changes",
+    "eda_EDA_iqr_5_95",
+    "temp_TEMP_energy",
+    "temp_l2_energy",
+    "acc_l2_min",
+    "temp_TEMP_sum",
+    "bvp_l2_peaks",
+    "eda_l2_min",
+    "eda_EDA_max"
+  ],
+  "threshold": 0.4095238095238095
+}
