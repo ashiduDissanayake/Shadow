@@ -37,6 +37,9 @@
 #include "realtime_sensor_buffer.h"
 #include "feature_extractor.h"
 #include "simple_mlp.h"
+#include "stress_fsm.h"
+#include "event_log.h"
+#include "ble_stress_service.h"
 
 static const char *TAG = "ShadowRealTime";
 
@@ -53,14 +56,26 @@ static gptimer_handle_t temp_timer = NULL;
 // Feature extraction workspace
 static feature_workspace_t g_feature_workspace;
 
+// Stress monitoring system
+static stress_fsm_context_t g_stress_fsm;
+static event_log_context_t g_event_log;
+
 // Statistics tracking
 static uint32_t total_inferences = 0;
 static uint32_t total_samples_collected = 0;
+static uint32_t total_state_transitions = 0;
 
 // Function declarations
 int extract_features_realtime(realtime_sensor_system_t *sensor_system, 
                              feature_workspace_t *workspace, 
                              feature_vector_t *result);
+
+// Stress transition callback function
+void on_stress_transition(const stress_state_transition_t *transition);
+
+// Stress FSM event callback
+// Stress transition callback function
+void on_stress_transition(const stress_state_transition_t *transition);
 
 // === REALISTIC SENSOR SIMULATION ===
 // Using dataset ranges for realistic mock data generation
@@ -145,6 +160,49 @@ static int32_t generate_mock_temp_int(void) {
     if (temp_value_int > 3593) temp_value_int = 3593;  // 35.93
     
     return temp_value_int;  // Return integer (fixed-point)
+}
+
+// === STRESS TRANSITION CALLBACK ===
+
+/**
+ * Called whenever the stress FSM confirms a state transition
+ * This is where we log events and trigger BLE communications
+ */
+void on_stress_transition(const stress_state_transition_t *transition) {
+    if (!transition) return;
+    
+    ESP_LOGI(TAG, "🔄 STRESS TRANSITION DETECTED!");
+    ESP_LOGI(TAG, "   %s → %s", 
+             stress_fsm_state_to_string(transition->from_state),
+             stress_fsm_state_to_string(transition->to_state));
+    ESP_LOGI(TAG, "   Confidence: %.3f", transition->confidence_score);
+    ESP_LOGI(TAG, "   Duration in prev state: %lu ms", transition->duration_prev_state_ms);
+    
+    // Get current sensor quality and battery voltage
+    uint8_t sensor_quality = 85; // TODO: Calculate from actual sensor data
+    uint16_t battery_mv = 3300;   // TODO: Read from ADC
+    
+    // Log the event to our ring buffer
+    uint8_t sequence = event_log_add_transition(&g_event_log, transition, 
+                                               sensor_quality, battery_mv);
+    
+    if (sequence != EVENT_LOG_INVALID_SEQUENCE) {
+        ESP_LOGI(TAG, "   ✅ Event logged with sequence #%d", sequence);
+        total_state_transitions++;
+        
+        // Update BLE advertisement with new state and sequence
+        if (ble_stress_service_update_advertisement(battery_mv, sensor_quality) == 0) {
+            ESP_LOGI(TAG, "   📡 BLE advertisement updated");
+        }
+        
+        // If connected, send real-time notification
+        if (ble_stress_service_is_connected() && ble_stress_service_notifications_enabled()) {
+            ble_stress_service_notify_fsm_state();
+            ESP_LOGI(TAG, "   📢 Real-time notification sent to connected client");
+        }
+    } else {
+        ESP_LOGE(TAG, "   ❌ Failed to log event!");
+    }
 }
 
 // === ISR CALLBACKS (ATOMIC DATA INGESTION) ===
@@ -317,9 +375,21 @@ void producer_task(void *param) {
         
         ESP_LOGI(TAG, "📊 Performance: %lu samples/sec (total: %lu)", 
                 samples_per_sec, current_samples);
+        ESP_LOGI(TAG, "🧠 ML Inferences: %lu total", total_inferences);
+        ESP_LOGI(TAG, "🔄 State Transitions: %lu total", total_state_transitions);
+        ESP_LOGI(TAG, "📻 BLE Connected: %s", ble_stress_service_is_connected() ? "YES" : "NO");
         
-        // Print detailed system status
-        realtime_print_status();
+        // Print detailed system status every 30 seconds
+        static uint8_t status_counter = 0;
+        status_counter++;
+        if (status_counter >= 6) { // 6 * 5 seconds = 30 seconds
+            status_counter = 0;
+            ESP_LOGI(TAG, "=== DETAILED SYSTEM STATUS ===");
+            realtime_print_status();
+            event_log_print_status(&g_event_log);
+            ble_stress_service_print_status();
+            ESP_LOGI(TAG, "==============================");
+        }
     }
 }
 
@@ -372,16 +442,42 @@ void consumer_task(void *param) {
             
             uint32_t total_time = (xTaskGetTickCount() * portTICK_PERIOD_MS) - inference_start;
             
+            // === STRESS FSM PROCESSING ===
+            // Process the ML result through the confirmation FSM
+            uint32_t current_time_ms = (uint32_t)(esp_timer_get_time() / 1000);
+            bool transition_occurred = stress_fsm_process_inference(&g_stress_fsm, 
+                                                                   stress_probability, 
+                                                                   current_time_ms,
+                                                                   on_stress_transition);
+            
             // Log results
             ESP_LOGI(TAG, "🎯 ML Inference Results:");
             ESP_LOGI(TAG, "   Stress Probability: %.3f", stress_probability);
             ESP_LOGI(TAG, "   Stress Class: %s", stress_class ? "STRESS" : "NORMAL");
+            ESP_LOGI(TAG, "   FSM State: %s", 
+                     stress_fsm_state_to_string(stress_fsm_get_current_state(&g_stress_fsm)));
+            ESP_LOGI(TAG, "   State Transition: %s", transition_occurred ? "YES" : "NO");
             ESP_LOGI(TAG, "   Feature Time: %lu ms", features.extraction_time_ms);
             ESP_LOGI(TAG, "   ML Time: %lu ms", ml_time);
             ESP_LOGI(TAG, "   Total Processing: %lu ms", total_time);
             ESP_LOGI(TAG, "   Batch Processed: %lu", min_batches);
             
             total_inferences++;
+            
+            // Update BLE advertisement if state changed
+            if (transition_occurred) {
+                // Get current battery voltage (mock for now)
+                uint16_t battery_mv = 3300 + (esp_random() % 500) - 250; // 3050-3550mV
+                uint8_t sensor_quality = 85 + (esp_random() % 20) - 10;  // 75-95%
+                
+                ble_stress_service_update_advertisement(battery_mv, sensor_quality);
+                
+                // Send notification if client is connected
+                if (ble_stress_service_notifications_enabled()) {
+                    ble_stress_service_notify_fsm_state();
+                }
+            }
+            
             ESP_LOGI(TAG, "---");
         }
     }
@@ -476,9 +572,9 @@ int extract_features_realtime(realtime_sensor_system_t *sensor_system,
 // === MAIN APPLICATION ===
 
 void app_main(void) {
-    ESP_LOGI(TAG, "🌟 Shadow Real-Time Stress Detection Firmware v2.0");
+    ESP_LOGI(TAG, "🌟 Shadow Real-Time Stress Detection Firmware v3.0");
     ESP_LOGI(TAG, "ESP32-S3 ISR-based Producer-Consumer Architecture");
-    ESP_LOGI(TAG, "Architecture: Atomic coordination + Event-driven processing");
+    ESP_LOGI(TAG, "Architecture: Atomic coordination + Event-driven processing + BLE Communication");
     
     // Initialize real-time sensor system
     ESP_LOGI(TAG, "Initializing real-time sensor buffer system...");
@@ -494,8 +590,39 @@ void app_main(void) {
         return;
     }
     
+    // Initialize stress FSM
+    ESP_LOGI(TAG, "Initializing stress finite state machine...");
+    if (stress_fsm_init(&g_stress_fsm) != 0) {
+        ESP_LOGE(TAG, "❌ Failed to initialize stress FSM");
+        return;
+    }
+    
+    // Initialize event logging system
+    ESP_LOGI(TAG, "Initializing event logging system...");
+    if (event_log_init(&g_event_log) != 0) {
+        ESP_LOGE(TAG, "❌ Failed to initialize event log");
+        return;
+    }
+    
+    // Initialize BLE stress service
+    ESP_LOGI(TAG, "Initializing BLE stress monitoring service...");
+    if (ble_stress_service_init(&g_stress_fsm, &g_event_log) != 0) {
+        ESP_LOGE(TAG, "❌ Failed to initialize BLE service");
+        return;
+    }
+    
     ESP_LOGI(TAG, "✅ System initialization complete!");
     ESP_LOGI(TAG, "Memory usage: %lu bytes", realtime_get_memory_usage());
+    
+    // Start BLE advertising
+    ESP_LOGI(TAG, "Starting BLE advertising...");
+    uint16_t initial_battery_mv = 3300;
+    uint8_t initial_sensor_quality = 85;
+    if (ble_stress_service_start_advertising(initial_battery_mv, initial_sensor_quality) == 0) {
+        ESP_LOGI(TAG, "✅ BLE advertising started");
+    } else {
+        ESP_LOGW(TAG, "⚠️  BLE advertising failed to start");
+    }
     
     // Create producer task on Core 0 (Timer management)
     xTaskCreatePinnedToCore(
@@ -521,7 +648,8 @@ void app_main(void) {
     
     ESP_LOGI(TAG, "🚀 Real-time tasks created successfully!");
     ESP_LOGI(TAG, "📡 Producer (Core 0): ISR-based data ingestion");
-    ESP_LOGI(TAG, "🧠 Consumer (Core 1): Event-driven ML processing");
+    ESP_LOGI(TAG, "🧠 Consumer (Core 1): Event-driven ML processing + FSM");
+    ESP_LOGI(TAG, "📻 BLE Service: Stress monitor communication");
     ESP_LOGI(TAG, "⚡ Coordination: Atomic batch counting + semaphore signaling");
     ESP_LOGI(TAG, "🎯 Real-time stress detection system ONLINE!");
 }
