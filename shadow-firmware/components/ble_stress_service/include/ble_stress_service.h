@@ -80,8 +80,9 @@ typedef struct __attribute__((packed)) {
 // Control Point Commands
 typedef enum {
     CTRL_CMD_REPLAY_FROM_SEQUENCE = 0x01,   // Request replay from specific sequence
-    CTRL_CMD_GET_SYSTEM_STATUS = 002,       // Request system status
-    CTRL_CMD_RESET_EVENT_LOG = 0x03         // Reset event log (for testing)
+    CTRL_CMD_GET_SYSTEM_STATUS = 0x02,      // Request system status
+    CTRL_CMD_RESET_EVENT_LOG = 0x03,        // Reset event log (for testing)
+    CTRL_CMD_ACKNOWLEDGE_TRANSITION = 0x04  // Acknowledge transition sequence (resets counter)
 } ble_control_command_t;
 
 // BLE Service Context

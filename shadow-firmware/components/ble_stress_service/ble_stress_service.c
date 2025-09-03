@@ -20,6 +20,10 @@ static event_log_context_t *g_event_ctx = NULL;
 static ble_service_stats_t g_stats = {0};
 static bool g_verbose_logging = false;
 
+// Advertisement state tracking
+static uint8_t g_transition_sequence = 1;           // Start from 1, now supports 0-127
+static stress_fsm_state_t g_last_advertised_state = FSM_STABLE_CALM;  // Track last stable state
+
 // === FORWARD DECLARATIONS ===
 static void handle_write_event(esp_ble_gatts_cb_param_t *param);
 static void handle_control_command(uint8_t *data, uint16_t len);
@@ -32,27 +36,6 @@ static void send_system_status(void);
  */
 static uint32_t get_current_time_ms(void) {
     return (uint32_t)(esp_timer_get_time() / 1000);
-}
-
-/**
- * Prepare advertisement payload with current state and data
- */
-static void prepare_advertisement_payload(ble_adv_payload_t *payload, 
-                                        uint16_t battery_mv, 
-                                        uint8_t sensor_quality) {
-    if (!payload) return;
-    
-    // Get current FSM state
-    payload->fsm_state = (uint8_t)stress_fsm_get_current_state(g_fsm_ctx);
-    
-    // Get latest sequence number
-    payload->sequence_number = event_log_get_latest_sequence(g_event_ctx);
-    if (payload->sequence_number == EVENT_LOG_INVALID_SEQUENCE) {
-        payload->sequence_number = 0; // No events logged yet
-    }
-    
-    payload->battery_mv = battery_mv;
-    payload->sensor_quality = sensor_quality;
 }
 
 /**
@@ -241,6 +224,20 @@ static void handle_control_command(uint8_t *data, uint16_t len) {
             event_log_reset(g_event_ctx);
             break;
             
+        case CTRL_CMD_ACKNOWLEDGE_TRANSITION:
+            if (len >= 2) {
+                uint8_t ack_sequence = data[1];
+                if (ack_sequence == g_transition_sequence) {
+                    // Reset transition sequence after acknowledgment (back to 1)
+                    g_transition_sequence = 1;
+                    ESP_LOGI(TAG, "✅ Transition sequence acknowledged and reset: seq=%d → 1", ack_sequence);
+                } else {
+                    ESP_LOGW(TAG, "⚠️  Transition sequence mismatch: expected=%d, got=%d", 
+                             g_transition_sequence, ack_sequence);
+                }
+            }
+            break;
+            
         default:
             ESP_LOGW(TAG, "Unknown control command: 0x%02X", cmd);
             break;
@@ -389,26 +386,64 @@ int ble_stress_service_start_advertising(uint16_t battery_mv, uint8_t sensor_qua
         return -1;
     }
     
-    // Prepare advertisement payload
-    ble_adv_payload_t payload;
-    prepare_advertisement_payload(&payload, battery_mv, sensor_quality);
+    // Set device name first - this is critical
+    esp_err_t ret = esp_ble_gap_set_device_name(BLE_DEVICE_NAME);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set device name: %s", esp_err_to_name(ret));
+        return -1;
+    }
+    ESP_LOGI(TAG, "Device name set to: %s", BLE_DEVICE_NAME);
     
-    // Configure advertisement data
-    esp_ble_adv_data_t adv_data = {
-        .set_scan_rsp = false,
-        .include_name = true,
-        .include_txpower = true,
-        .min_interval = BLE_ADV_INTERVAL_MIN,
-        .max_interval = BLE_ADV_INTERVAL_MAX,
-        .appearance = 0x00,
-        .manufacturer_len = sizeof(ble_adv_payload_t),
-        .p_manufacturer_data = (uint8_t*)&payload,
-        .service_data_len = 0,
-        .p_service_data = NULL,
-        .service_uuid_len = 2,
-        .p_service_uuid = (uint8_t[]){STRESS_SERVICE_UUID & 0xFF, (STRESS_SERVICE_UUID >> 8) & 0xFF},
-        .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
-    };
+    // Create compact service data - combine state and sequence into single byte
+    // Format: [Service UUID (2 bytes)] + [Combined State+Seq (1 byte)]
+    // Combined byte: bits 7-1 = sequence (0-127), bit 0 = state (0=CALM, 1=STRESS)
+    uint8_t service_data[3];
+    service_data[0] = (STRESS_SERVICE_UUID & 0xFF);        // LSB of UUID (0x00)
+    service_data[1] = (STRESS_SERVICE_UUID >> 8) & 0xFF;   // MSB of UUID (0x18)
+    
+    stress_fsm_state_t current_state = stress_fsm_get_current_state(g_fsm_ctx);
+    uint8_t advertised_state;
+    
+    // Only advertise stable states for Mac app
+    if (current_state == FSM_STABLE_CALM || current_state == FSM_STABLE_STRESS) {
+        // Convert FSM states to binary: CALM=0, STRESS=1
+        advertised_state = (current_state == FSM_STABLE_STRESS) ? 1 : 0;
+        
+        // Increment sequence number only when stable state actually changes
+        if (current_state != g_last_advertised_state) {
+            g_transition_sequence = (g_transition_sequence + 1) % 128;  // Use full 7 bits: 0-127
+            g_last_advertised_state = current_state;
+            ESP_LOGI(TAG, "🔄 Stable state transition: %s → seq=%d", 
+                     stress_fsm_state_to_string(current_state), g_transition_sequence);
+        }
+    } else {
+        // For transitional states, keep advertising the last stable state
+        // This prevents rapid changes but maintains sequence consistency
+        advertised_state = (g_last_advertised_state == FSM_STABLE_STRESS) ? 1 : 0;
+    }
+    
+    // Combine sequence (high 7 bits) and state (low 1 bit) into single byte
+    uint8_t combined_data = (g_transition_sequence << 1) | (advertised_state & 0x01);
+    service_data[2] = combined_data;
+    
+    // Debug: Print exact bytes being sent
+    ESP_LOGI(TAG, "🔍 Service data bytes: [0x%02X, 0x%02X, 0x%02X]", 
+             service_data[0], service_data[1], service_data[2]);
+    ESP_LOGI(TAG, "🔍 Combined data breakdown: seq=%d (0x%X), state=%d, combined=0x%02X", 
+             g_transition_sequence, g_transition_sequence, advertised_state, combined_data);
+    ESP_LOGI(TAG, "🔍 Bit layout: [seq(7-1)=%d][state(0)=%d] = 0x%02X", 
+             g_transition_sequence, advertised_state, combined_data);
+    
+    // Minimal advertisement optimized for Mac app scanning
+    esp_ble_adv_data_t adv_data = {0};
+    adv_data.set_scan_rsp = false;
+    adv_data.include_name = true;       // "Shadow" device name
+    adv_data.include_txpower = false;   // Remove to save space and reduce noise
+    adv_data.flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT);
+    
+    // Use service data to include our state and sequence
+    adv_data.service_data_len = sizeof(service_data);
+    adv_data.p_service_data = service_data;
     
     // Set advertisement parameters
     esp_ble_adv_params_t adv_params = {
@@ -420,16 +455,35 @@ int ble_stress_service_start_advertising(uint16_t battery_mv, uint8_t sensor_qua
         .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
     };
     
-    // Set device name
-    esp_ble_gap_set_device_name(BLE_DEVICE_NAME);
+    // Configure advertisement data
+    ret = esp_ble_gap_config_adv_data(&adv_data);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to config adv data: %s", esp_err_to_name(ret));
+        return -1;
+    }
     
-    // Configure and start advertising
-    esp_ble_gap_config_adv_data(&adv_data);
-    esp_ble_gap_start_advertising(&adv_params);
+    // Start advertising
+    ret = esp_ble_gap_start_advertising(&adv_params);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start advertising: %s", esp_err_to_name(ret));
+        return -1;
+    }
     
-    ESP_LOGI(TAG, "🔊 Starting advertisement: FSM=%s, Seq=%d, Battery=%dmV", 
-             stress_fsm_state_to_string((stress_fsm_state_t)payload.fsm_state),
-             payload.sequence_number, payload.battery_mv);
+    uint8_t extracted_state = service_data[2] & 0x01;        // Extract state (bit 0)
+    uint8_t extracted_sequence = (service_data[2] >> 1) & 0x7F;  // Extract sequence (bits 7-1)
+    
+    ESP_LOGI(TAG, "🔊 Compact advertisement: Device=Shadow, State=%d, Seq=%d", 
+             extracted_state, extracted_sequence);
+    
+    // Log the compact advertisement structure for Mac app
+    ESP_LOGI(TAG, "📱 Mac app will see:");
+    ESP_LOGI(TAG, "  - Device Name: %s", BLE_DEVICE_NAME);
+    ESP_LOGI(TAG, "  - Service Data UUID: 0x%04X", STRESS_SERVICE_UUID);
+    ESP_LOGI(TAG, "  - Service Data: [0x%02X, 0x%02X, 0x%02X]", 
+             service_data[0], service_data[1], service_data[2]);
+    ESP_LOGI(TAG, "  - Combined Data: 0x%02X (seq=%d, state=%d)", 
+             service_data[2], extracted_sequence, extracted_state);
+    ESP_LOGI(TAG, "  - Expected raw: ...041600180%02X", service_data[2]);
     
     return 0;
 }
@@ -447,7 +501,7 @@ int ble_stress_service_update_advertisement(uint16_t battery_mv, uint8_t sensor_
     // Stop current advertising
     esp_ble_gap_stop_advertising();
     
-    // Start with new data
+    // Start with new FSM state (only changing variable)
     return ble_stress_service_start_advertising(battery_mv, sensor_quality);
 }
 

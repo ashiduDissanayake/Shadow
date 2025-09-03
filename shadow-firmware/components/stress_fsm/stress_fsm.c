@@ -243,21 +243,9 @@ stress_fsm_state_t stress_fsm_get_current_state(stress_fsm_context_t *ctx) {
         return FSM_STABLE_CALM; // Safe default
     }
     
-    stress_fsm_state_t state = FSM_STABLE_CALM;
-    
-    if (xSemaphoreTake(ctx->mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-        state = ctx->current_state;
-        xSemaphoreGive(ctx->mutex);
-    }
-    
-    // Only return stable states for external consumption
-    if (!stress_fsm_is_stable_state(state)) {
-        // If we're in an intermediate state, return the last stable state
-        // This ensures external consumers only see confirmed states
-        return (state == FSM_SUSPECT_STRESS) ? FSM_STABLE_CALM : FSM_STABLE_STRESS;
-    }
-    
-    return state;
+    // For BLE advertisement updates during callbacks, use direct access to avoid deadlock
+    // The state variable is atomic for reads, mutex is only needed for state transitions
+    return ctx->current_state;
 }
 
 uint32_t stress_fsm_get_state_duration(stress_fsm_context_t *ctx, uint32_t current_time_ms) {
