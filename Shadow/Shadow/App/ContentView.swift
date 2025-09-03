@@ -4,9 +4,18 @@ import CoreData
 struct ContentView: View {
     @StateObject private var authVM = AuthViewModel()
     @StateObject var calendarViewModel = CalendarViewModel()
-    @StateObject private var bleManager = BLEManager()
+    @StateObject private var shadowBLEManager: ShadowBLEManager
     @State private var showingProfilePage = false
-    @State private var showingCalendar = false // <-- Add this line
+    @State private var showingCalendar = false
+    
+    // Core Data context
+    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject private var coreDataManager: ShadowCoreDataManager
+
+    init() {
+        // Create a placeholder BLE manager that will be updated in onAppear
+        _shadowBLEManager = StateObject(wrappedValue: ShadowBLEManager())
+    }
 
     var body: some View {
         NavigationStack {
@@ -25,15 +34,15 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     // AppNavBar: Only show when user is logged in
                     if let profile = authVM.profile, authVM.isLoggedIn {
-                        AppNavBar(
+                        ShadowAppNavBar(
                             title: "Shadow",
                             subtitle: "TinyML Stress Detection",
                             profile: profile,
                             onProfileTap: { showingProfilePage = true },
                             onLogout: handleLogout,
                             showProfileMenu: true,
-                            onCalendarTap: { showingCalendar = true }, // <-- Pass closure here
-                            bleManager: bleManager // Pass BLE manager for status/actions
+                            onCalendarTap: { showingCalendar = true },
+                            shadowBLEManager: shadowBLEManager
                         )
                     }
                     // Main content
@@ -52,6 +61,10 @@ struct ContentView: View {
                 }
             }
         }
+        .onAppear {
+            // Update the BLE manager with the proper Core Data manager
+            shadowBLEManager.setCoreDataManager(coreDataManager)
+        }
     }
 
     @ViewBuilder
@@ -66,8 +79,9 @@ struct ContentView: View {
                     onProfileUpdated: handleProfileUpdated
                 )
             } else {
-                DashboardView(
+                ShadowDashboardView(
                     profile: profile,
+                    shadowBLEManager: shadowBLEManager,
                     onLogout: handleLogout,
                     onDeleteAccount: { handleDeleteAccount(for: profile) },
                     onShowProfile: { showingProfilePage = true }
@@ -84,11 +98,13 @@ struct ContentView: View {
 
     private func handleLogout() {
         showingProfilePage = false
+        shadowBLEManager.disconnect()
         authVM.logout()
     }
 
     private func handleDeleteAccount(for profile: UserProfile) {
         showingProfilePage = false
+        shadowBLEManager.disconnect()
         authVM.deleteAccount(email: profile.email ?? "")
     }
 

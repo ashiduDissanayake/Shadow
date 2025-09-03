@@ -10,10 +10,31 @@
         <attribute name="title" optional="YES" attributeType="String"/>
         <relationship name="userProfile" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProfile" inverseName="events" inverseEntity="UserProfile"/>
     </entity>
+    <entity name="ShadowDevice" representedClassName="ShadowDevice" syncable="YES" codeGenerationType="class">
+        <attribute name="deviceIdentifier" attributeType="String"/>
+        <attribute name="deviceName" optional="YES" attributeType="String"/>
+        <attribute name="lastConnectedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastKnownSequence" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lastKnownState" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="stressEvents" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="StressEvent" inverseName="device" inverseEntity="StressEvent"/>
+        <relationship name="userProfile" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProfile" inverseName="shadowDevices" inverseEntity="UserProfile"/>
+    </entity>
+    <entity name="StressEvent" representedClassName="StressEvent" syncable="YES" codeGenerationType="class">
+        <attribute name="batteryVoltage" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="confidenceScore" optional="YES" attributeType="Float" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="durationPrevState" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="receivedTimestamp" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="sensorQuality" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="sequenceNumber" attributeType="Integer 16" usesScalarValueType="YES"/>
+        <attribute name="stressState" attributeType="Integer 16" usesScalarValueType="YES"/>
+        <attribute name="timestamp" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="device" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ShadowDevice" inverseName="stressEvents" inverseEntity="ShadowDevice"/>
+    </entity>
     <entity name="UserProfile" representedClassName="UserProfile" syncable="YES" codeGenerationType="class">
         <attribute name="email" optional="YES" attributeType="String"/>
         <attribute name="name" optional="YES" attributeType="String"/>
         <attribute name="workRole" optional="YES" attributeType="String"/>
         <relationship name="events" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Event" inverseName="userProfile" inverseEntity="Event"/>
+        <relationship name="shadowDevices" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ShadowDevice" inverseName="userProfile" inverseEntity="ShadowDevice"/>
     </entity>
 </model>
