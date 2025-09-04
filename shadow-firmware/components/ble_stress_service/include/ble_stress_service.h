@@ -132,7 +132,7 @@ void ble_stress_service_deinit(void);
  * @param sensor_quality Current sensor quality (0-100)
  * @return 0 on success, -1 on error
  */
-int ble_stress_service_start_advertising(uint16_t battery_mv, uint8_t sensor_quality);
+int ble_stress_service_start_advertising(void);
 
 /**
  * Stop BLE advertising

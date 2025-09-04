@@ -122,9 +122,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
             ESP_LOGI(TAG, "🔌 Client disconnected");
             
             // Restart advertising after disconnection
-            uint16_t battery_mv = 3300; // Default value - should be read from ADC
-            uint8_t sensor_quality = 85; // Default value - should be calculated
-            ble_stress_service_start_advertising(battery_mv, sensor_quality);
+            ble_stress_service_start_advertising();
             break;
             
         case ESP_GATTS_WRITE_EVT:
@@ -380,7 +378,7 @@ void ble_stress_service_deinit(void) {
     ESP_LOGI(TAG, "BLE Stress Service deinitialized");
 }
 
-int ble_stress_service_start_advertising(uint16_t battery_mv, uint8_t sensor_quality) {
+int ble_stress_service_start_advertising(void) {
     if (!g_service.initialized) {
         ESP_LOGE(TAG, "Service not initialized");
         return -1;
@@ -402,7 +400,7 @@ int ble_stress_service_start_advertising(uint16_t battery_mv, uint8_t sensor_qua
     service_data[1] = (STRESS_SERVICE_UUID >> 8) & 0xFF;   // MSB of UUID (0x18)
     
     stress_fsm_state_t current_state = stress_fsm_get_current_state(g_fsm_ctx);
-    uint8_t advertised_state;
+    uint8_t advertised_state = 0; // Default to CALM
     
     // Only advertise stable states for Mac app
     if (current_state == FSM_STABLE_CALM || current_state == FSM_STABLE_STRESS) {
@@ -502,7 +500,7 @@ int ble_stress_service_update_advertisement(uint16_t battery_mv, uint8_t sensor_
     esp_ble_gap_stop_advertising();
     
     // Start with new FSM state (only changing variable)
-    return ble_stress_service_start_advertising(battery_mv, sensor_quality);
+    return ble_stress_service_start_advertising();
 }
 
 int ble_stress_service_notify_fsm_state(void) {

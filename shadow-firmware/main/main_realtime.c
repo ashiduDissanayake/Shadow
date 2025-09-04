@@ -606,6 +606,9 @@ void app_main(void) {
     
     // Initialize BLE stress service
     ESP_LOGI(TAG, "Initializing BLE stress monitoring service...");
+    
+    // Initialize BLE stress service
+    ESP_LOGI(TAG, "Initializing BLE stress service...");
     if (ble_stress_service_init(&g_stress_fsm, &g_event_log) != 0) {
         ESP_LOGE(TAG, "❌ Failed to initialize BLE service");
         return;
@@ -616,9 +619,7 @@ void app_main(void) {
     
     // Start BLE advertising
     ESP_LOGI(TAG, "Starting BLE advertising...");
-    uint16_t initial_battery_mv = 3300;
-    uint8_t initial_sensor_quality = 85;
-    if (ble_stress_service_start_advertising(initial_battery_mv, initial_sensor_quality) == 0) {
+    if (ble_stress_service_start_advertising() == 0) {
         ESP_LOGI(TAG, "✅ BLE advertising started");
     } else {
         ESP_LOGW(TAG, "⚠️  BLE advertising failed to start");
