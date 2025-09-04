@@ -15,20 +15,14 @@ struct ShadowDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header section
                 headerSection
-                
-                // Shadow monitoring status
                 shadowStatusSection
                 
-                // Recent stress events
                 if !recentEvents.isEmpty {
                     recentEventsSection
                 }
                 
-                // Debug section
                 debugSection
-                
                 Spacer(minLength: 20)
             }
             .padding(.horizontal, 20)
@@ -50,13 +44,14 @@ struct ShadowDashboardView: View {
         }
         .onAppear {
             syncViewModel.start()
-            recentEvents = StressDataRepository.shared.recentEvents()
+            recentEvents = syncViewModel.getRecentEvents()
         }
         .onReceive(syncViewModel.$eventsReceived) { _ in
-            recentEvents = StressDataRepository.shared.recentEvents()
+            recentEvents = syncViewModel.getRecentEvents()
         }
     }
     
+    // MARK: Header
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -73,36 +68,31 @@ struct ShadowDashboardView: View {
                         .foregroundColor(.white.opacity(0.8))
                 }
             }
-            
             Text("Shadow stress monitoring dashboard")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.7))
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
         )
     }
     
+    // MARK: Status Section
     private var shadowStatusSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "brain.head.profile")
                     .font(.title2)
                     .foregroundColor(.blue)
-                
                 Text("Shadow Monitoring")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
-                
                 Spacer()
-                
                 statusIndicator
             }
             
-            // Current status details
             VStack(spacing: 12) {
                 statusRow("System Status", syncViewModel.stateText, systemColor: systemStatusColor)
                 statusRow("Last Sync", syncViewModel.lastSync, systemColor: .secondary)
@@ -110,18 +100,13 @@ struct ShadowDashboardView: View {
                 statusRow("Events Received", "\(syncViewModel.eventsReceived)", systemColor: .secondary)
             }
             
-            // Action buttons
             HStack(spacing: 12) {
                 if syncViewModel.isActive {
-                    Button("Stop Sync") {
-                        syncViewModel.stop()
-                    }
-                    .buttonStyle(ShadowButtonStyle(color: .orange))
+                    Button("Stop Sync") { syncViewModel.stop() }
+                        .buttonStyle(ShadowButtonStyle(color: .orange))
                 } else {
-                    Button("Start Sync") {
-                        syncViewModel.start()
-                    }
-                    .buttonStyle(ShadowButtonStyle(color: .blue))
+                    Button("Start Sync") { syncViewModel.start() }
+                        .buttonStyle(ShadowButtonStyle(color: .blue))
                 }
                 
                 Button("Refresh Data") {
@@ -132,29 +117,22 @@ struct ShadowDashboardView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
         )
-        .onAppear {
-            syncViewModel.start()
-            recentEvents = syncViewModel.getRecentEvents()
-        }
     }
     
+    // MARK: Recent Events
     private var recentEventsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.title3)
                     .foregroundColor(.green)
-                
                 Text("Recent Activity")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
-                
                 Spacer()
-                
                 Text("\(recentEvents.count) events")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
@@ -182,36 +160,31 @@ struct ShadowDashboardView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
         )
     }
     
+    // MARK: Debug Section
     private var debugSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "terminal")
                     .font(.title3)
                     .foregroundColor(.purple)
-                
                 Text("System Debug")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
-                
                 Spacer()
-                
-                Button("View Full Log") {
-                    showingDebugLog = true
-                }
-                .buttonStyle(ShadowButtonStyle(color: .purple, size: .small))
+                Button("View Full Log") { showingDebugLog = true }
+                    .buttonStyle(ShadowButtonStyle(color: .purple, size: .small))
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(syncViewModel.log.suffix(3)), id: \.self) { logEntry in
-                    Text(logEntry)
+                ForEach(Array(syncViewModel.log.suffix(3).enumerated()), id: \.offset) { _, line in
+                    Text(line)
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.white.opacity(0.85))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(
@@ -230,8 +203,7 @@ struct ShadowDashboardView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
         )
     }
     
@@ -241,23 +213,21 @@ struct ShadowDashboardView: View {
             Circle()
                 .fill(systemStatusColor)
                 .frame(width: 8, height: 8)
-            
             Text(syncViewModel.stateText)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(.white.opacity(0.85))
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 6).fill(.ultraThinMaterial)
         )
     }
     
     private var systemStatusColor: Color {
         if syncViewModel.isActive {
             return .orange
-        } else if syncViewModel.stateText == "Up to Date" {
+        } else if syncViewModel.stateText == "Up To Date" {
             return .green
         } else {
             return .gray
@@ -269,20 +239,12 @@ struct ShadowDashboardView: View {
             Text(title)
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.7))
-            
             Spacer()
-            
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(systemColor ?? .white)
         }
-    }
-    
-    private func timeAgo(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
@@ -294,8 +256,8 @@ struct ShadowDebugLogView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(syncViewModel.log, id: \.self) { logEntry in
-                        Text(logEntry)
+                    ForEach(Array(syncViewModel.log.enumerated()), id: \.offset) { _, entry in
+                        Text(entry)
                             .font(.caption)
                             .foregroundColor(.primary)
                             .textSelection(.enabled)
@@ -320,14 +282,11 @@ struct ShadowDebugLogView: View {
             .navigationTitle("Debug Log")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
+                    Button("Close") { dismiss() }
                 }
-                
                 ToolbarItem(placement: .primaryAction) {
                     Button("Clear") {
-                        // Clear handled by the logger itself
+                        // Optional: implement clearing logs if desired
                     }
                 }
             }
@@ -344,26 +303,21 @@ struct ShadowButtonStyle: ButtonStyle {
         
         var padding: EdgeInsets {
             switch self {
-            case .normal:
-                return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-            case .small:
-                return EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
+            case .normal: return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+            case .small:  return EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
             }
         }
-        
         var font: Font {
             switch self {
-            case .normal:
-                return .caption
-            case .small:
-                return .caption2
+            case .normal: return .caption
+            case .small:  return .caption2
             }
         }
     }
     
     init(color: Color, size: ButtonSize = .normal) {
         self.color = color
-        self.size = size
+        self.size  = size
     }
     
     func makeBody(configuration: Configuration) -> some View {
@@ -380,4 +334,3 @@ struct ShadowButtonStyle: ButtonStyle {
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
-

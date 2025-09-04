@@ -346,10 +346,6 @@ void event_log_print_status(event_log_context_t *ctx) {
         ESP_LOGI(TAG, "Events stored: %d/%d (%d%%)", 
                  stats.events_available, EVENT_LOG_CAPACITY, stats.buffer_usage_percent);
         ESP_LOGI(TAG, "Current sequence: %d", stats.current_sequence);
-        ESP_LOGI(TAG, "Last ACK sequence: %d", 
-                 is_valid_sequence(stats.last_acknowledged_sequence) ? 
-                 stats.last_acknowledged_sequence : 0);
-        ESP_LOGI(TAG, "Unacknowledged events: %d", stats.events_unacknowledged);
         ESP_LOGI(TAG, "Total logged: %lu (overwritten: %lu)", 
                  stats.total_events_logged, stats.events_overwritten);
     }

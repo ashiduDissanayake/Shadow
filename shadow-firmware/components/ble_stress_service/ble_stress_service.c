@@ -1,621 +1,405 @@
-/*
- * ESP32-S3 BLE Stress Monitor Service Implementation
- * 
- * Implements the complete BLE GATT service for stress monitor communication
- * including advertising, GATT server, and data exchange protocols.
+/**
+ * Simplified BLE Stress Service (ESP32)
+ *
+ * Advertisement (Service Data AD type 0x16):
+ *   Bytes placed (service_data_len=3):
+ *     [ UUID_LSB, UUID_MSB, combined ]
+ *   CoreBluetooth strips the 2-byte UUID when exposing serviceData[UUID],
+ *   so the macOS app receives a single byte: combined
+ *
+ * combined = (sequence << 1) | stateBit
+ *   sequence: 7-bit rolling counter (0–127), incremented ONLY on confirmed stable
+ *             transitions between FSM_STABLE_CALM and FSM_STABLE_STRESS.
+ *   stateBit: 0 = CALM, 1 = STRESS (transitional states reuse last stable bit).
+ *
+ * GATT:
+ *   Service UUID: 0xA000
+ *   Characteristic UUID: 0xA002 (READ | WRITE, no notifications)
+ *
+ *   READ (without prior WRITE or if no missed events scenario):
+ *     Returns 2 bytes: [ currentSequence, currentStateBit ]
+ *
+ *   WRITE (1 byte: clientLastKnownSequence), then READ:
+ *     Returns extended structure:
+ *       Byte0: currentSequence
+ *       Byte1: currentStateBit
+ *       Byte2: missedCount (N = number of intervening events excluding the final one)
+ *       Then N * 2 bytes: (sequence, stateBit) pairs for missed events
+ *     Definitions:
+ *       clientLastKnownSequence = the highest sequence the client already has
+ *       currentSequence = device's latest stable transition sequence
+ *       We gather all logged transitions with sequence > clientLastKnownSequence
+ *       Of those, the final one (highest sequence == currentSequence) gives
+ *       current state; earlier ones are "missed".
  */
 
 #include "ble_stress_service.h"
-#include <string.h>
+#include "stress_fsm.h"
+#include "event_log.h"
+
+#include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_flash.h"
-#include "esp_bt_device.h"
+#include "esp_bt.h"
+#include "esp_bt_main.h"
+#include "esp_gap_ble_api.h"
+#include "esp_gatts_api.h"
+#include <string.h>
 
-static const char *TAG = "BLEStressService";
+#define TAG "BLEStressSimple"
 
-// Global service context
-static ble_stress_service_t g_service = {0};
-static stress_fsm_context_t *g_fsm_ctx = NULL;
-static event_log_context_t *g_event_ctx = NULL;
-static ble_service_stats_t g_stats = {0};
-static bool g_verbose_logging = false;
+// UUIDs
+#define SIMPLE_SERVICE_UUID      0xA000
+#define SIMPLE_CHAR_UUID         0xA002
 
-// Advertisement state tracking
-static uint8_t g_transition_sequence = 1;           // Start from 1, now supports 0-127
-static stress_fsm_state_t g_last_advertised_state = FSM_STABLE_CALM;  // Track last stable state
+// Rolling sequence and stable state tracking
+static uint8_t g_sequence = 0;  // 0–127
+static stress_fsm_state_t g_last_stable_state = FSM_STABLE_CALM;
 
-// === FORWARD DECLARATIONS ===
-static void handle_write_event(esp_ble_gatts_cb_param_t *param);
-static void handle_control_command(uint8_t *data, uint16_t len);
-static void send_system_status(void);
+// Context
+static stress_fsm_context_t *g_fsm = NULL;
+static event_log_context_t *g_event_log = NULL;
 
-// === PRIVATE HELPER FUNCTIONS ===
+static bool g_initialized = false;
+static bool g_connected = false;
 
-/**
- * Get current time in milliseconds
- */
-static uint32_t get_current_time_ms(void) {
-    return (uint32_t)(esp_timer_get_time() / 1000);
-}
+static uint16_t g_gatts_if = 0;
+static uint16_t g_service_handle = 0;
+static uint16_t g_char_handle = 0;
+static uint16_t g_conn_id = 0;
 
-/**
- * GAP event handler
- */
-static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
-    switch (event) {
-        case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-            if (g_verbose_logging) {
-                ESP_LOGI(TAG, "Advertisement data set complete");
-            }
-            break;
-            
-        case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
-            if (param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
-                ESP_LOGI(TAG, "🔊 BLE advertising started");
-                g_stats.advertisements_sent++;
-            } else {
-                ESP_LOGE(TAG, "Failed to start advertising: %d", param->adv_start_cmpl.status);
-            }
-            break;
-            
-        case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
-            ESP_LOGI(TAG, "🔇 BLE advertising stopped");
-            break;
-            
-        default:
-            if (g_verbose_logging) {
-                ESP_LOGD(TAG, "GAP event: %d", event);
-            }
-            break;
-    }
-}
+// Extended response buffer (prepared after WRITE, consumed on next READ)
+static uint8_t g_resp_buffer[80];
+static uint16_t g_resp_len = 0;
+static bool g_have_extended = false;
 
-/**
- * GATTS event handler
- */
-static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, 
-                               esp_ble_gatts_cb_param_t *param) {
-    
-    if (event == ESP_GATTS_REG_EVT) {
-        if (param->reg.status == ESP_GATT_OK) {
-            g_service.gatts_if = gatts_if;
-            ESP_LOGI(TAG, "GATT server registered");
-        } else {
-            ESP_LOGE(TAG, "GATT server registration failed: %d", param->reg.status);
-        }
-        return;
-    }
-    
-    if (gatts_if != g_service.gatts_if) {
-        return; // Not our interface
-    }
-    
-    switch (event) {
-        case ESP_GATTS_CREATE_EVT:
-            if (param->create.status == ESP_GATT_OK) {
-                g_service.service_handle = param->create.service_handle;
-                ESP_LOGI(TAG, "Service created with handle %d", g_service.service_handle);
-                
-                // Start the service
-                esp_ble_gatts_start_service(g_service.service_handle);
-            }
-            break;
-            
-        case ESP_GATTS_START_EVT:
-            ESP_LOGI(TAG, "✅ GATT service started");
-            break;
-            
-        case ESP_GATTS_CONNECT_EVT:
-            g_service.connected = true;
-            g_service.conn_id = param->connect.conn_id;
-            g_stats.connections_established++;
-            ESP_LOGI(TAG, "🔗 Client connected (conn_id: %d)", g_service.conn_id);
-            
-            // Stop advertising when connected
-            esp_ble_gap_stop_advertising();
-            break;
-            
-        case ESP_GATTS_DISCONNECT_EVT:
-            g_service.connected = false;
-            g_service.notifications_enabled = false;
-            g_service.indications_enabled = false;
-            ESP_LOGI(TAG, "🔌 Client disconnected");
-            
-            // Restart advertising after disconnection
-            ble_stress_service_start_advertising();
-            break;
-            
-        case ESP_GATTS_WRITE_EVT:
-            handle_write_event(param);
-            break;
-            
-        case ESP_GATTS_CONF_EVT:
-            if (g_verbose_logging) {
-                ESP_LOGI(TAG, "Indication confirmed by client");
-            }
-            break;
-            
-        default:
-            if (g_verbose_logging) {
-                ESP_LOGD(TAG, "GATTS event: %d", event);
-            }
-            break;
-    }
-}
+// Forward declarations
+static void gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
+static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+                     esp_ble_gatts_cb_param_t *param);
+static void update_advertisement(void);
+static void prepare_minimal_response(void);
+static void prepare_extended_response(uint8_t clientLastSeq);
 
-/**
- * Handle GATT write events (acknowledgments and control commands)
- */
-static void handle_write_event(esp_ble_gatts_cb_param_t *param) {
-    if (param->write.handle == g_service.char_handles[EVENT_ACK_VAL_HANDLE]) {
-        // Event acknowledgment received
-        if (param->write.len == 1) {
-            uint8_t ack_sequence = param->write.value[0];
-            if (event_log_acknowledge_sequence(g_event_ctx, ack_sequence)) {
-                g_stats.acknowledgments_received++;
-                ESP_LOGI(TAG, "✅ Host acknowledged sequence %d", ack_sequence);
-            }
-        }
-        
-    } else if (param->write.handle == g_service.char_handles[CONTROL_POINT_VAL_HANDLE]) {
-        // Control point command received
-        handle_control_command(param->write.value, param->write.len);
-        g_stats.control_commands_received++;
-        
-    } else if (param->write.handle == g_service.char_handles[FSM_STATE_CFG_HANDLE]) {
-        // FSM state notification configuration
-        if (param->write.len == 2) {
-            uint16_t config = (param->write.value[1] << 8) | param->write.value[0];
-            g_service.notifications_enabled = (config & 0x0001) != 0;
-            ESP_LOGI(TAG, "FSM notifications %s", g_service.notifications_enabled ? "enabled" : "disabled");
-        }
-        
-    } else if (param->write.handle == g_service.char_handles[EVENT_DATA_CFG_HANDLE]) {
-        // Event data indication configuration
-        if (param->write.len == 2) {
-            uint16_t config = (param->write.value[1] << 8) | param->write.value[0];
-            g_service.indications_enabled = (config & 0x0002) != 0;
-            ESP_LOGI(TAG, "Event indications %s", g_service.indications_enabled ? "enabled" : "disabled");
+// --------------------------------------------------
+// Utility
+// --------------------------------------------------
+static void maybe_increment_sequence(void) {
+    stress_fsm_state_t current = stress_fsm_get_current_state(g_fsm);
+    if (current == FSM_STABLE_CALM || current == FSM_STABLE_STRESS) {
+        if (current != g_last_stable_state) {
+            g_sequence = (g_sequence + 1) & 0x7F;
+            g_last_stable_state = current;
+            ESP_LOGI(TAG, "Stable transition -> seq=%u state=%s",
+                     g_sequence, stress_fsm_state_to_string(current));
         }
     }
-    
-    // Send response
-    esp_ble_gatts_send_response(g_service.gatts_if, param->write.conn_id, 
-                               param->write.trans_id, ESP_GATT_OK, NULL);
 }
 
-/**
- * Handle control point commands
- */
-static void handle_control_command(uint8_t *data, uint16_t len) {
-    if (!data || len == 0) return;
-    
-    ble_control_command_t cmd = (ble_control_command_t)data[0];
-    
-    switch (cmd) {
-        case CTRL_CMD_REPLAY_FROM_SEQUENCE:
-            if (len >= 2) {
-                uint8_t start_sequence = data[1];
-                ESP_LOGI(TAG, "🔄 Host requested replay from sequence %d", start_sequence);
-                
-                // Get events starting from requested sequence
-                stress_event_t events[16]; // Reasonable batch size
-                uint8_t count = event_log_get_events_from_sequence(g_event_ctx, start_sequence, 
-                                                                  events, 16);
-                
-                if (count > 0) {
-                    ble_stress_service_send_event_batch(events, count);
-                    ESP_LOGI(TAG, "Sent %d events for replay", count);
-                } else {
-                    ESP_LOGI(TAG, "No events found for replay from sequence %d", start_sequence);
-                }
-            }
-            break;
-            
-        case CTRL_CMD_GET_SYSTEM_STATUS:
-            ESP_LOGI(TAG, "📊 Host requested system status");
-            send_system_status();
-            break;
-            
-        case CTRL_CMD_RESET_EVENT_LOG:
-            ESP_LOGW(TAG, "⚠️  Host requested event log reset");
-            event_log_reset(g_event_ctx);
-            break;
-            
-        case CTRL_CMD_ACKNOWLEDGE_TRANSITION:
-            if (len >= 2) {
-                uint8_t ack_sequence = data[1];
-                if (ack_sequence == g_transition_sequence) {
-                    // Reset transition sequence after acknowledgment (back to 1)
-                    g_transition_sequence = 1;
-                    ESP_LOGI(TAG, "✅ Transition sequence acknowledged and reset: seq=%d → 1", ack_sequence);
-                } else {
-                    ESP_LOGW(TAG, "⚠️  Transition sequence mismatch: expected=%d, got=%d", 
-                             g_transition_sequence, ack_sequence);
-                }
-            }
-            break;
-            
-        default:
-            ESP_LOGW(TAG, "Unknown control command: 0x%02X", cmd);
-            break;
-    }
+static uint8_t stable_state_bit(void) {
+    return (g_last_stable_state == FSM_STABLE_STRESS) ? 1 : 0;
 }
 
-/**
- * Send system status to connected client
- */
-static void send_system_status(void) {
-    // Create a status payload
-    struct {
-        uint8_t fsm_state;
-        uint8_t current_sequence;
-        uint8_t events_available;
-        uint8_t events_unacknowledged;
-        uint16_t battery_mv;
-        uint8_t sensor_quality;
-        uint32_t uptime_ms;
-    } __attribute__((packed)) status;
-    
-    status.fsm_state = (uint8_t)stress_fsm_get_current_state(g_fsm_ctx);
-    status.current_sequence = event_log_get_latest_sequence(g_event_ctx);
-    
-    event_log_stats_t event_stats;
-    if (event_log_get_statistics(g_event_ctx, &event_stats)) {
-        status.events_available = event_stats.events_available;
-        status.events_unacknowledged = event_stats.events_unacknowledged;
-    } else {
-        status.events_available = 0;
-        status.events_unacknowledged = 0;
-    }
-    
-    status.battery_mv = 3300; // Should be read from ADC
-    status.sensor_quality = 85; // Should be calculated
-    status.uptime_ms = get_current_time_ms();
-    
-    // Send as indication
-    if (g_service.connected && g_service.indications_enabled) {
-        esp_ble_gatts_send_indicate(g_service.gatts_if, g_service.conn_id,
-                                   g_service.char_handles[EVENT_DATA_VAL_HANDLE],
-                                   sizeof(status), (uint8_t*)&status, false);
-    }
-}
+// --------------------------------------------------
+// Advertisement
+// --------------------------------------------------
+static void update_advertisement(void) {
+    maybe_increment_sequence();
 
-// === PUBLIC API IMPLEMENTATION ===
+    uint8_t combined = (uint8_t)((g_sequence << 1) | stable_state_bit());
 
-int ble_stress_service_init(stress_fsm_context_t *fsm_ctx, event_log_context_t *event_ctx) {
-    if (!fsm_ctx || !event_ctx) {
-        ESP_LOGE(TAG, "Invalid context pointers");
-        return -1;
-    }
-    
-    g_fsm_ctx = fsm_ctx;
-    g_event_ctx = event_ctx;
-    
-    // Clear service context
-    memset(&g_service, 0, sizeof(ble_stress_service_t));
-    memset(&g_stats, 0, sizeof(ble_service_stats_t));
-    
-    // Create mutex for thread safety
-    g_service.mutex = xSemaphoreCreateMutex();
-    if (g_service.mutex == NULL) {
-        ESP_LOGE(TAG, "Failed to create BLE service mutex");
-        return -1;
-    }
-    
-    // Initialize NVS for BLE
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-    
-    // Initialize Bluetooth
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
-    
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ret = esp_bt_controller_init(&bt_cfg);
-    if (ret) {
-        ESP_LOGE(TAG, "Initialize controller failed: %s", esp_err_to_name(ret));
-        return -1;
-    }
-    
-    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-    if (ret) {
-        ESP_LOGE(TAG, "Enable controller failed: %s", esp_err_to_name(ret));
-        return -1;
-    }
-    
-    ret = esp_bluedroid_init();
-    if (ret) {
-        ESP_LOGE(TAG, "Init bluetooth failed: %s", esp_err_to_name(ret));
-        return -1;
-    }
-    
-    ret = esp_bluedroid_enable();
-    if (ret) {
-        ESP_LOGE(TAG, "Enable bluetooth failed: %s", esp_err_to_name(ret));
-        return -1;
-    }
-    
-    // Register GAP and GATTS callbacks
-    esp_ble_gap_register_callback(gap_event_handler);
-    esp_ble_gatts_register_callback(gatts_event_handler);
-    
-    // Register GATT application
-    esp_ble_gatts_app_register(0);
-    
-    g_service.initialized = true;
-    ESP_LOGI(TAG, "✅ BLE Stress Service initialized");
-    
-    return 0;
-}
-
-void ble_stress_service_deinit(void) {
-    if (!g_service.initialized) return;
-    
-    // Stop advertising if active
-    esp_ble_gap_stop_advertising();
-    
-    // Disconnect if connected
-    if (g_service.connected) {
-        esp_ble_gatts_close(g_service.gatts_if, g_service.conn_id);
-    }
-    
-    // Cleanup Bluetooth
-    esp_bluedroid_disable();
-    esp_bluedroid_deinit();
-    esp_bt_controller_disable();
-    esp_bt_controller_deinit();
-    
-    if (g_service.mutex != NULL) {
-        vSemaphoreDelete(g_service.mutex);
-        g_service.mutex = NULL;
-    }
-    
-    g_service.initialized = false;
-    ESP_LOGI(TAG, "BLE Stress Service deinitialized");
-}
-
-int ble_stress_service_start_advertising(void) {
-    if (!g_service.initialized) {
-        ESP_LOGE(TAG, "Service not initialized");
-        return -1;
-    }
-    
-    // Set device name first - this is critical
-    esp_err_t ret = esp_ble_gap_set_device_name(BLE_DEVICE_NAME);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set device name: %s", esp_err_to_name(ret));
-        return -1;
-    }
-    ESP_LOGI(TAG, "Device name set to: %s", BLE_DEVICE_NAME);
-    
-    // Create compact service data - combine state and sequence into single byte
-    // Format: [Service UUID (2 bytes)] + [Combined State+Seq (1 byte)]
-    // Combined byte: bits 7-1 = sequence (0-127), bit 0 = state (0=CALM, 1=STRESS)
+    // Service Data payload: [UUID_LSB, UUID_MSB, combinedByte]
     uint8_t service_data[3];
-    service_data[0] = (STRESS_SERVICE_UUID & 0xFF);        // LSB of UUID (0x00)
-    service_data[1] = (STRESS_SERVICE_UUID >> 8) & 0xFF;   // MSB of UUID (0x18)
-    
-    stress_fsm_state_t current_state = stress_fsm_get_current_state(g_fsm_ctx);
-    uint8_t advertised_state = 0; // Default to CALM
-    
-    // Only advertise stable states for Mac app
-    if (current_state == FSM_STABLE_CALM || current_state == FSM_STABLE_STRESS) {
-        // Convert FSM states to binary: CALM=0, STRESS=1
-        advertised_state = (current_state == FSM_STABLE_STRESS) ? 1 : 0;
-        
-        // Increment sequence number only when stable state actually changes
-        if (current_state != g_last_advertised_state) {
-            g_transition_sequence = (g_transition_sequence + 1) % 128;  // Use full 7 bits: 0-127
-            g_last_advertised_state = current_state;
-            ESP_LOGI(TAG, "🔄 Stable state transition: %s → seq=%d", 
-                     stress_fsm_state_to_string(current_state), g_transition_sequence);
-        }
-    } else {
-        // For transitional states, keep advertising the last stable state
-        // This prevents rapid changes but maintains sequence consistency
-        advertised_state = (g_last_advertised_state == FSM_STABLE_STRESS) ? 1 : 0;
-    }
-    
-    // Combine sequence (high 7 bits) and state (low 1 bit) into single byte
-    uint8_t combined_data = (g_transition_sequence << 1) | (advertised_state & 0x01);
-    service_data[2] = combined_data;
-    
-    // Debug: Print exact bytes being sent
-    ESP_LOGI(TAG, "🔍 Service data bytes: [0x%02X, 0x%02X, 0x%02X]", 
-             service_data[0], service_data[1], service_data[2]);
-    ESP_LOGI(TAG, "🔍 Combined data breakdown: seq=%d (0x%X), state=%d, combined=0x%02X", 
-             g_transition_sequence, g_transition_sequence, advertised_state, combined_data);
-    ESP_LOGI(TAG, "🔍 Bit layout: [seq(7-1)=%d][state(0)=%d] = 0x%02X", 
-             g_transition_sequence, advertised_state, combined_data);
-    
-    // Minimal advertisement optimized for Mac app scanning
-    esp_ble_adv_data_t adv_data = {0};
-    adv_data.set_scan_rsp = false;
-    adv_data.include_name = true;       // "Shadow" device name
-    adv_data.include_txpower = false;   // Remove to save space and reduce noise
-    adv_data.flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT);
-    
-    // Use service data to include our state and sequence
-    adv_data.service_data_len = sizeof(service_data);
-    adv_data.p_service_data = service_data;
-    
-    // Set advertisement parameters
+    service_data[0] = SIMPLE_SERVICE_UUID & 0xFF;
+    service_data[1] = (SIMPLE_SERVICE_UUID >> 8) & 0xFF;
+    service_data[2] = combined;
+
+    esp_ble_adv_data_t adv_data = {
+        .set_scan_rsp = false,
+        .include_name = true,
+        .include_txpower = false,
+        .service_data_len = sizeof(service_data),
+        .p_service_data = service_data,
+        .flag = ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT
+    };
+
     esp_ble_adv_params_t adv_params = {
-        .adv_int_min = BLE_ADV_INTERVAL_MIN,
-        .adv_int_max = BLE_ADV_INTERVAL_MAX,
+        .adv_int_min = 160,  // 100ms
+        .adv_int_max = 320,  // 200ms
         .adv_type = ADV_TYPE_IND,
         .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
         .channel_map = ADV_CHNL_ALL,
         .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
     };
+
+    ESP_ERROR_CHECK(esp_ble_gap_config_adv_data(&adv_data));
+    ESP_ERROR_CHECK(esp_ble_gap_start_advertising(&adv_params));
+
+    ESP_LOGI(TAG, "Advertising combined=0x%02X sequence=%u stateBit=%u",
+             combined, g_sequence, stable_state_bit());
+}
+
+// --------------------------------------------------
+// Responses
+// --------------------------------------------------
+static void prepare_minimal_response(void) {
+    g_resp_buffer[0] = g_sequence;
+    g_resp_buffer[1] = stable_state_bit();
+    g_resp_len = 2;
+    g_have_extended = false;
+}
+
+static void prepare_extended_response(uint8_t clientLastSeq) {
+    // Collect events strictly greater than clientLastSeq
+    // We'll use existing event_log API:
+    // event_log_get_events_from_sequence(context, start_sequence, outArray, maxCount)
+    // returns events with sequence >= start_sequence.
+    //
+    // We want events > clientLastSeq, so start_sequence = clientLastSeq + 1.
+    // The highest event is the "current" new sequence (if present).
+    // All preceding form the "missed" list.
     
-    // Configure advertisement data
-    ret = esp_ble_gap_config_adv_data(&adv_data);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to config adv data: %s", esp_err_to_name(ret));
-        return -1;
+    stress_event_t events[20];
+    uint8_t startSeq = (clientLastSeq + 1) & 0x7F; // modulo wrap
+    uint8_t count = event_log_get_events_from_sequence(g_event_log, startSeq, events, 20);
+
+    if (count == 0) {
+        // No new events; fallback to minimal
+        prepare_minimal_response();
+        return;
+    }
+
+    // The highest (last) event corresponds to current stable transition
+    // We assume event sequence numbers are strictly increasing modulo 128
+    // For simplicity we ignore wrap anomaly inside this window.
+    stress_event_t *latest = &events[count - 1];
+    uint8_t currentSeq = latest->sequence_number;
+    uint8_t currentStateBit = (latest->new_state == FSM_STABLE_STRESS) ? 1 : 0;
+
+    // Missed events exclude the latest one:
+    uint8_t missedCount = (count > 1) ? (count - 1) : 0;
+
+    uint16_t idx = 0;
+    g_resp_buffer[idx++] = currentSeq;
+    g_resp_buffer[idx++] = currentStateBit;
+    g_resp_buffer[idx++] = missedCount;
+
+    for (uint8_t i = 0; i < missedCount; i++) {
+        g_resp_buffer[idx++] = events[i].sequence_number;
+        uint8_t st = (events[i].new_state == FSM_STABLE_STRESS) ? 1 : 0;
+        g_resp_buffer[idx++] = st;
+    }
+
+    g_resp_len = idx;
+    g_have_extended = true;
+    ESP_LOGI(TAG, "Prepared extended response currentSeq=%u missedCount=%u", currentSeq, missedCount);
+}
+
+// --------------------------------------------------
+// GAP Callback
+// --------------------------------------------------
+static void gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+    switch (event) {
+        case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+            // Data prepared
+            break;
+        case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+            if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+                ESP_LOGE(TAG, "Failed to start advertising: %d", param->adv_start_cmpl.status);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+// --------------------------------------------------
+// GATTS Callback
+// --------------------------------------------------
+static void on_write_event(esp_ble_gatts_cb_param_t *param) {
+    if (param->write.handle != g_char_handle) {
+        return;
+    }
+    if (param->write.len != 1) {
+        ESP_LOGW(TAG, "Unexpected write length=%d", param->write.len);
+        // Fallback minimal response
+        prepare_minimal_response();
+    } else {
+        uint8_t clientLastSeq = param->write.value[0] & 0x7F;
+        ESP_LOGI(TAG, "WRITE: client lastKnownSequence=%u", clientLastSeq);
+        prepare_extended_response(clientLastSeq);
+    }
+
+    esp_ble_gatts_send_response(g_gatts_if,
+                                param->write.conn_id,
+                                param->write.trans_id,
+                                ESP_GATT_OK,
+                                NULL);
+}
+
+static void on_read_event(esp_ble_gatts_cb_param_t *param) {
+    if (param->read.handle != g_char_handle) {
+        esp_ble_gatts_send_response(g_gatts_if,
+                                    param->read.conn_id,
+                                    param->read.trans_id,
+                                    ESP_GATT_OK,
+                                    NULL);
+        return;
+    }
+
+    // If no extended response prepared, supply minimal
+    if (!g_have_extended) {
+        prepare_minimal_response();
     }
     
-    // Start advertising
-    ret = esp_ble_gap_start_advertising(&adv_params);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start advertising: %s", esp_err_to_name(ret));
-        return -1;
+    esp_gatt_rsp_t rsp;
+    memset(&rsp, 0, sizeof(rsp));
+    rsp.attr_value.handle = g_char_handle;
+    rsp.attr_value.len = g_resp_len;
+    if (g_resp_len > sizeof(rsp.attr_value.value)) {
+        rsp.attr_value.len = sizeof(rsp.attr_value.value);
     }
-    
-    uint8_t extracted_state = service_data[2] & 0x01;        // Extract state (bit 0)
-    uint8_t extracted_sequence = (service_data[2] >> 1) & 0x7F;  // Extract sequence (bits 7-1)
-    
-    ESP_LOGI(TAG, "🔊 Compact advertisement: Device=Shadow, State=%d, Seq=%d", 
-             extracted_state, extracted_sequence);
-    
-    // Log the compact advertisement structure for Mac app
-    ESP_LOGI(TAG, "📱 Mac app will see:");
-    ESP_LOGI(TAG, "  - Device Name: %s", BLE_DEVICE_NAME);
-    ESP_LOGI(TAG, "  - Service Data UUID: 0x%04X", STRESS_SERVICE_UUID);
-    ESP_LOGI(TAG, "  - Service Data: [0x%02X, 0x%02X, 0x%02X]", 
-             service_data[0], service_data[1], service_data[2]);
-    ESP_LOGI(TAG, "  - Combined Data: 0x%02X (seq=%d, state=%d)", 
-             service_data[2], extracted_sequence, extracted_state);
-    ESP_LOGI(TAG, "  - Expected raw: ...041600180%02X", service_data[2]);
-    
+    memcpy(rsp.attr_value.value, g_resp_buffer, rsp.attr_value.len);
+
+    esp_ble_gatts_send_response(g_gatts_if,
+                                param->read.conn_id,
+                                param->read.trans_id,
+                                ESP_GATT_OK,
+                                &rsp);
+
+    // Extended responses are one-shot; clear after read
+    g_have_extended = false;
+}
+
+static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+                     esp_ble_gatts_cb_param_t *param) {
+    if (event == ESP_GATTS_REG_EVT) {
+        if (param->reg.status == ESP_GATT_OK) {
+            g_gatts_if = gatts_if;
+            ESP_LOGI(TAG, "GATT registered");
+            // Create service
+            esp_gatt_srvc_id_t sid = {
+                .is_primary = true,
+                .id = {
+                    .inst_id = 0,
+                    .uuid = {
+                        .len = ESP_UUID_LEN_16,
+                        .uuid = { .uuid16 = SIMPLE_SERVICE_UUID }
+                    }
+                }
+            };
+            esp_ble_gatts_create_service(gatts_if, &sid, 4);
+        } else {
+            ESP_LOGE(TAG, "GATT reg failed: %d", param->reg.status);
+        }
+        return;
+    }
+
+    if (gatts_if != g_gatts_if) return;
+
+    switch (event) {
+        case ESP_GATTS_CREATE_EVT:
+            if (param->create.status == ESP_GATT_OK) {
+                g_service_handle = param->create.service_handle;
+                ESP_LOGI(TAG, "Service created handle=%u", g_service_handle);
+                esp_ble_gatts_start_service(g_service_handle);
+
+                // Add characteristic
+                esp_bt_uuid_t uuid = {
+                    .len = ESP_UUID_LEN_16,
+                    .uuid = { .uuid16 = SIMPLE_CHAR_UUID }
+                };
+                esp_gatt_char_prop_t prop = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
+                esp_ble_gatts_add_char(g_service_handle, &uuid,
+                                       ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+                                       prop, NULL, NULL);
+            }
+            break;
+
+        case ESP_GATTS_ADD_CHAR_EVT:
+            if (param->add_char.status == ESP_GATT_OK) {
+                g_char_handle = param->add_char.attr_handle;
+                ESP_LOGI(TAG, "Characteristic added handle=%u", g_char_handle);
+                // Start advertising immediately
+                update_advertisement();
+            } else {
+                ESP_LOGE(TAG, "Add char failed: %d", param->add_char.status);
+            }
+            break;
+
+        case ESP_GATTS_CONNECT_EVT:
+            g_connected = true;
+            g_conn_id = param->connect.conn_id;
+            ESP_LOGI(TAG, "Client connected (conn_id=%u)", g_conn_id);
+            // Stop advertising while connected (optional)
+            esp_ble_gap_stop_advertising();
+            break;
+
+        case ESP_GATTS_DISCONNECT_EVT:
+            g_connected = false;
+            ESP_LOGI(TAG, "Client disconnected");
+            // Resume advertising with up-to-date sequence/state
+            update_advertisement();
+            break;
+
+        case ESP_GATTS_WRITE_EVT:
+            on_write_event(param);
+            break;
+
+        case ESP_GATTS_READ_EVT:
+            on_read_event(param);
+            break;
+
+        default:
+            break;
+    }
+}
+
+// --------------------------------------------------
+// Public API (Header)
+// --------------------------------------------------
+int ble_stress_service_init(stress_fsm_context_t *fsm_ctx, event_log_context_t *event_ctx) {
+    if (g_initialized) return 0;
+    if (!fsm_ctx || !event_ctx) return -1;
+
+    g_fsm = fsm_ctx;
+    g_event_log = event_ctx;
+
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
+    }
+
+    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
+    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
+    ESP_ERROR_CHECK(esp_bluedroid_init());
+    ESP_ERROR_CHECK(esp_bluedroid_enable());
+
+    ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_cb));
+    ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_cb));
+    ESP_ERROR_CHECK(esp_ble_gatts_app_register(0));
+
+    g_initialized = true;
+    ESP_LOGI(TAG, "BLE Stress Simple Service initialized");
     return 0;
 }
 
-int ble_stress_service_stop_advertising(void) {
-    return esp_ble_gap_stop_advertising();
-}
-
-int ble_stress_service_update_advertisement(uint16_t battery_mv, uint8_t sensor_quality) {
-    if (!g_service.initialized) return -1;
-    
-    // If we're connected, no need to update advertisement
-    if (g_service.connected) return 0;
-    
-    // Stop current advertising
+void ble_stress_service_deinit(void) {
+    if (!g_initialized) return;
     esp_ble_gap_stop_advertising();
-    
-    // Start with new FSM state (only changing variable)
-    return ble_stress_service_start_advertising();
+    g_initialized = false;
 }
 
-int ble_stress_service_notify_fsm_state(void) {
-    if (!g_service.connected || !g_service.notifications_enabled) {
-        return -1;
+void ble_stress_service_tick(void) {
+    // Call periodically (e.g. every few seconds or on state transition)
+    if (!g_connected) {
+        // Rebuild advertisement if stable state changed
+        update_advertisement();
+    } else {
+        // While connected we do not re-advertise
+        maybe_increment_sequence(); // Keep internal sequence correct if state changes mid-connection
     }
-    
-    // Prepare FSM state notification data
-    struct {
-        uint8_t fsm_state;
-        uint8_t sequence_number;
-    } __attribute__((packed)) state_data;
-    
-    state_data.fsm_state = (uint8_t)stress_fsm_get_current_state(g_fsm_ctx);
-    state_data.sequence_number = event_log_get_latest_sequence(g_event_ctx);
-    
-    esp_err_t ret = esp_ble_gatts_send_indicate(g_service.gatts_if, g_service.conn_id,
-                                               g_service.char_handles[FSM_STATE_VAL_HANDLE],
-                                               sizeof(state_data), (uint8_t*)&state_data, false);
-    
-    if (ret == ESP_OK) {
-        g_stats.notifications_sent++;
-        if (g_verbose_logging) {
-            ESP_LOGI(TAG, "📢 FSM state notification sent");
-        }
-    }
-    
-    return (ret == ESP_OK) ? 0 : -1;
-}
-
-int ble_stress_service_indicate_event_data(const stress_event_t *event) {
-    if (!g_service.connected || !g_service.indications_enabled || !event) {
-        return -1;
-    }
-    
-    esp_err_t ret = esp_ble_gatts_send_indicate(g_service.gatts_if, g_service.conn_id,
-                                               g_service.char_handles[EVENT_DATA_VAL_HANDLE],
-                                               sizeof(stress_event_t), (uint8_t*)event, false);
-    
-    if (ret == ESP_OK) {
-        g_stats.indications_sent++;
-        ESP_LOGI(TAG, "📤 Event indication sent: seq=%d, state=%s", 
-                 event->sequence_number, 
-                 stress_fsm_state_to_string(event->new_state));
-    }
-    
-    return (ret == ESP_OK) ? 0 : -1;
-}
-
-int ble_stress_service_send_event_batch(const stress_event_t *events, uint8_t count) {
-    if (!events || count == 0) return 0;
-    
-    int sent = 0;
-    for (uint8_t i = 0; i < count; i++) {
-        if (ble_stress_service_indicate_event_data(&events[i]) == 0) {
-            sent++;
-            // Add small delay between indications
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-    }
-    
-    return sent;
-}
-
-bool ble_stress_service_is_connected(void) {
-    return g_service.connected;
-}
-
-bool ble_stress_service_notifications_enabled(void) {
-    return g_service.notifications_enabled;
-}
-
-bool ble_stress_service_indications_enabled(void) {
-    return g_service.indications_enabled;
-}
-
-bool ble_stress_service_get_statistics(ble_service_stats_t *stats) {
-    if (!stats) return false;
-    
-    if (xSemaphoreTake(g_service.mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-        *stats = g_stats;
-        xSemaphoreGive(g_service.mutex);
-        return true;
-    }
-    
-    return false;
-}
-
-int ble_stress_service_disconnect_client(void) {
-    if (!g_service.connected) return -1;
-    
-    return esp_ble_gatts_close(g_service.gatts_if, g_service.conn_id);
-}
-
-void ble_stress_service_print_status(void) {
-    ESP_LOGI(TAG, "=== BLE Stress Service Status ===");
-    ESP_LOGI(TAG, "Initialized: %s", g_service.initialized ? "YES" : "NO");
-    ESP_LOGI(TAG, "Connected: %s", g_service.connected ? "YES" : "NO");
-    ESP_LOGI(TAG, "Notifications enabled: %s", g_service.notifications_enabled ? "YES" : "NO");
-    ESP_LOGI(TAG, "Indications enabled: %s", g_service.indications_enabled ? "YES" : "NO");
-    ESP_LOGI(TAG, "Advertisements sent: %lu", g_stats.advertisements_sent);
-    ESP_LOGI(TAG, "Connections established: %lu", g_stats.connections_established);
-    ESP_LOGI(TAG, "Notifications sent: %lu", g_stats.notifications_sent);
-    ESP_LOGI(TAG, "Indications sent: %lu", g_stats.indications_sent);
-    ESP_LOGI(TAG, "Acknowledgments received: %lu", g_stats.acknowledgments_received);
-}
-
-void ble_stress_service_reset_statistics(void) {
-    if (xSemaphoreTake(g_service.mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-        memset(&g_stats, 0, sizeof(ble_service_stats_t));
-        xSemaphoreGive(g_service.mutex);
-    }
-}
-
-void ble_stress_service_set_verbose_logging(bool enable) {
-    g_verbose_logging = enable;
-    ESP_LOGI(TAG, "Verbose logging %s", enable ? "enabled" : "disabled");
 }
