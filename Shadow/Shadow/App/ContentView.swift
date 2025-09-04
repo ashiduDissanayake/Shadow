@@ -4,18 +4,12 @@ import CoreData
 struct ContentView: View {
     @StateObject private var authVM = AuthViewModel()
     @StateObject var calendarViewModel = CalendarViewModel()
-    @StateObject private var shadowBLEManager: ShadowBLEManager
+    @StateObject private var syncViewModel = SyncDashboardViewModel()
     @State private var showingProfilePage = false
     @State private var showingCalendar = false
     
-    // Core Data context
+    // Core Data context (no longer need ShadowCoreDataManager)
     @Environment(\.managedObjectContext) private var viewContext
-    @EnvironmentObject private var coreDataManager: ShadowCoreDataManager
-
-    init() {
-        // Create a placeholder BLE manager that will be updated in onAppear
-        _shadowBLEManager = StateObject(wrappedValue: ShadowBLEManager())
-    }
 
     var body: some View {
         NavigationStack {
@@ -42,7 +36,7 @@ struct ContentView: View {
                             onLogout: handleLogout,
                             showProfileMenu: true,
                             onCalendarTap: { showingCalendar = true },
-                            shadowBLEManager: shadowBLEManager
+                            syncViewModel: syncViewModel
                         )
                     }
                     // Main content
@@ -61,10 +55,6 @@ struct ContentView: View {
                 }
             }
         }
-        .onAppear {
-            // Update the BLE manager with the proper Core Data manager
-            shadowBLEManager.setCoreDataManager(coreDataManager)
-        }
     }
 
     @ViewBuilder
@@ -81,7 +71,6 @@ struct ContentView: View {
             } else {
                 ShadowDashboardView(
                     profile: profile,
-                    shadowBLEManager: shadowBLEManager,
                     onLogout: handleLogout,
                     onDeleteAccount: { handleDeleteAccount(for: profile) },
                     onShowProfile: { showingProfilePage = true }
@@ -98,13 +87,13 @@ struct ContentView: View {
 
     private func handleLogout() {
         showingProfilePage = false
-        shadowBLEManager.disconnect()
+        syncViewModel.stop()
         authVM.logout()
     }
 
     private func handleDeleteAccount(for profile: UserProfile) {
         showingProfilePage = false
-        shadowBLEManager.disconnect()
+        syncViewModel.stop()
         authVM.deleteAccount(email: profile.email ?? "")
     }
 

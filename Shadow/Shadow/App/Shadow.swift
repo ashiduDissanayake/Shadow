@@ -28,7 +28,6 @@ struct Shadow: App {
         WindowGroup {
             ContentView()
                 .environment(\.managedObjectContext, persistentContainer.viewContext)
-                .environmentObject(ShadowCoreDataManager(persistentContainer: persistentContainer))
         }
     }
 }

@@ -8,7 +8,7 @@ struct ShadowAppNavBar: View {
     let onLogout: () -> Void
     let showProfileMenu: Bool
     let onCalendarTap: () -> Void
-    @ObservedObject var shadowBLEManager: ShadowBLEManager
+    @ObservedObject var syncViewModel: SyncDashboardViewModel
     
     @State private var showBLEPopover = false
     
@@ -52,7 +52,7 @@ struct ShadowAppNavBar: View {
                 )
             }
             .popover(isPresented: $showBLEPopover) {
-                ShadowBLEPopoverView(shadowBLEManager: shadowBLEManager)
+                ShadowBLEPopoverView(syncViewModel: syncViewModel)
             }
             
             // Calendar button
@@ -106,25 +106,16 @@ struct ShadowAppNavBar: View {
     
     @ViewBuilder
     private var bleStatusIcon: some View {
-        switch shadowBLEManager.currentSystemStatus {
-        case .synchronizing:
+        if syncViewModel.isActive {
+            Image(systemName: "bluetooth")
+                .foregroundColor(.orange)
+                .font(.caption)
+                .symbolEffect(.pulse, options: .repeating)
+        } else if syncViewModel.stateText == "Up to Date" {
             Image(systemName: "bluetooth.fill")
                 .foregroundColor(.green)
                 .font(.caption)
-                
-        case .scanning:
-            Image(systemName: "bluetooth")
-                .foregroundColor(.orange)
-                .font(.caption)
-                .symbolEffect(.pulse, options: .repeating)
-                
-        case .connecting:
-            Image(systemName: "bluetooth")
-                .foregroundColor(.orange)
-                .font(.caption)
-                .symbolEffect(.pulse, options: .repeating)
-                
-        case .disconnected:
+        } else {
             Image(systemName: "bluetooth.slash")
                 .foregroundColor(.gray)
                 .font(.caption)
@@ -132,44 +123,42 @@ struct ShadowAppNavBar: View {
     }
     
     private var bleStatusText: String {
-        switch shadowBLEManager.currentSystemStatus {
-        case .synchronizing:
-            return "Syncing"
-        case .scanning:
-            return "Scanning"
-        case .connecting:
-            return "Connecting"
-        case .disconnected:
-            return "Disconnected"
-        }
+        return syncViewModel.stateText
     }
     
     private var bleStatusColor: Color {
-        switch shadowBLEManager.currentSystemStatus {
-        case .synchronizing:
-            return .green
-        case .scanning, .connecting:
+        if syncViewModel.isActive {
             return .orange
-        case .disconnected:
+        } else if syncViewModel.stateText == "Up to Date" {
+            return .green
+        } else {
             return .gray
         }
     }
 }
 
 struct ShadowBLEPopoverView: View {
-    @ObservedObject var shadowBLEManager: ShadowBLEManager
+    @ObservedObject var syncViewModel: SyncDashboardViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .foregroundColor(.blue)
+                Image(systemName: "brain.head.profile")
                     .font(.title2)
+                    .foregroundColor(.blue)
                 
-                Text("Shadow BLE Monitor")
-                    .font(.headline)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading) {
+                    Text("Shadow Monitor")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Text("TinyML Stress Detection")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
             }
             
             Divider()
@@ -180,35 +169,36 @@ struct ShadowBLEPopoverView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text(shadowBLEManager.currentSystemStatus.displayName)
+                Text(syncViewModel.stateText)
                     .font(.body)
                     .foregroundColor(statusColor)
                     .padding(.leading, 20)
             }
             
-            // Current state section
-            if shadowBLEManager.connectedDevice != nil {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Current State", systemImage: "brain.head.profile")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
+            // Sync Info section
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Sync Info", systemImage: "arrow.clockwise")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Circle()
-                            .fill(shadowBLEManager.lastStressEvent == "No recent events" ? .gray : .orange)
-                            .frame(width: 12, height: 12)
-                        
-                        Text(shadowBLEManager.lastStressEvent)
-                            .font(.body)
-                        
+                        Text("Last Sync:")
                         Spacer()
-                        
-                        Text("Seq: \(shadowBLEManager.lastSequenceNumber)")
+                        Text(syncViewModel.lastSync)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    .padding(.leading, 20)
+                    
+                    HStack {
+                        Text("Sequence:")
+                        Spacer()
+                        Text(syncViewModel.sequenceStatus)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
+                .padding(.leading, 20)
             }
             
             // Statistics
@@ -221,14 +211,7 @@ struct ShadowBLEPopoverView: View {
                     HStack {
                         Text("Events Received:")
                         Spacer()
-                        Text("\(shadowBLEManager.totalEventsReceived)")
-                            .fontWeight(.medium)
-                    }
-                    
-                    HStack {
-                        Text("Devices Found:")
-                        Spacer()
-                        Text("\(shadowBLEManager.foundShadowDevices.count)")
+                        Text("\(syncViewModel.eventsReceived)")
                             .fontWeight(.medium)
                     }
                 }
@@ -236,95 +219,42 @@ struct ShadowBLEPopoverView: View {
                 .padding(.leading, 20)
             }
             
-            // Action buttons
-            HStack(spacing: 12) {
-                if shadowBLEManager.isScanning {
-                    Button("Stop Scan") {
-                        shadowBLEManager.stopScanning()
-                    }
-                    .buttonStyle(.bordered)
-                } else {
-                    Button("Start Scan") {
-                        shadowBLEManager.startScanning()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                
-                if shadowBLEManager.connectedDevice != nil {
-                    Button("Disconnect") {
-                        shadowBLEManager.disconnect()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                
-                Button("Clear Log") {
-                    shadowBLEManager.clearDebugLog()
-                }
-                .buttonStyle(.bordered)
-            }
-            
             Divider()
             
-            // Device list
-            if !shadowBLEManager.foundShadowDevices.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Found Devices", systemImage: "list.bullet")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    ForEach(shadowBLEManager.foundShadowDevices) { device in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(device.name)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                
-                                Text("State: \(device.advertisedState.displayName)")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("Seq: \(device.advertisedSequence)")
-                                    .font(.caption2)
-                                
-                                Text("\(device.rssi) dBm")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            if shadowBLEManager.connectedDevice?.id != device.peripheral.identifier {
-                                Button("Connect") {
-                                    shadowBLEManager.connectToDevice(device)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.mini)
-                            } else {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .font(.caption)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 4)
+            // Control buttons
+            HStack(spacing: 12) {
+                if syncViewModel.isActive {
+                    Button("Stop Sync") {
+                        syncViewModel.stop()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                } else {
+                    Button("Start Sync") {
+                        syncViewModel.start()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
+                
+                Button("Refresh") {
+                    // Refresh handled by view model
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
         }
         .padding()
-        .frame(minWidth: 300, maxWidth: 400)
+        .frame(width: 300)
     }
     
     private var statusColor: Color {
-        switch shadowBLEManager.currentSystemStatus {
-        case .synchronizing:
-            return .green
-        case .scanning, .connecting:
+        if syncViewModel.isActive {
             return .orange
-        case .disconnected:
-            return .primary
+        } else if syncViewModel.stateText == "Up to Date" {
+            return .green
+        } else {
+            return .gray
         }
     }
 }

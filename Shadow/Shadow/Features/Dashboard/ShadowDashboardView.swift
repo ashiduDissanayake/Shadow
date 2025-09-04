@@ -1,13 +1,16 @@
 import SwiftUI
+import Combine
+import CoreData
 
 struct ShadowDashboardView: View {
     let profile: UserProfile
-    @ObservedObject var shadowBLEManager: ShadowBLEManager
+    @StateObject private var syncViewModel = SyncDashboardViewModel()
     let onLogout: () -> Void
     let onDeleteAccount: () -> Void
     let onShowProfile: () -> Void
     
     @State private var showingDebugLog = false
+    @State private var recentEvents: [StressEvent] = []
     
     var body: some View {
         ScrollView {
@@ -19,7 +22,7 @@ struct ShadowDashboardView: View {
                 shadowStatusSection
                 
                 // Recent stress events
-                if shadowBLEManager.totalEventsReceived > 0 {
+                if !recentEvents.isEmpty {
                     recentEventsSection
                 }
                 
@@ -43,13 +46,14 @@ struct ShadowDashboardView: View {
             .ignoresSafeArea()
         )
         .sheet(isPresented: $showingDebugLog) {
-            ShadowDebugLogView(shadowBLEManager: shadowBLEManager)
+            ShadowDebugLogView(syncViewModel: syncViewModel)
         }
         .onAppear {
-            // Start scanning when dashboard appears
-            if shadowBLEManager.isBluetoothPoweredOn && !shadowBLEManager.isScanning {
-                shadowBLEManager.startScanning()
-            }
+            syncViewModel.start()
+            recentEvents = StressDataRepository.shared.recentEvents()
+        }
+        .onReceive(syncViewModel.$eventsReceived) { _ in
+            recentEvents = StressDataRepository.shared.recentEvents()
         }
     }
     
@@ -100,37 +104,30 @@ struct ShadowDashboardView: View {
             
             // Current status details
             VStack(spacing: 12) {
-                statusRow("System Status", shadowBLEManager.currentSystemStatus.displayName, systemColor: systemStatusColor)
-                
-                if shadowBLEManager.connectedDevice != nil {
-                    statusRow("Current State", shadowBLEManager.lastStressEvent, systemColor: .orange)
-                    statusRow("Sequence Number", "\(shadowBLEManager.lastSequenceNumber)", systemColor: .secondary)
-                }
-                
-                statusRow("Devices Found", "\(shadowBLEManager.foundShadowDevices.count)", systemColor: .secondary)
-                statusRow("Events Received", "\(shadowBLEManager.totalEventsReceived)", systemColor: .secondary)
+                statusRow("System Status", syncViewModel.stateText, systemColor: systemStatusColor)
+                statusRow("Last Sync", syncViewModel.lastSync, systemColor: .secondary)
+                statusRow("Sequence Info", syncViewModel.sequenceStatus, systemColor: .secondary)
+                statusRow("Events Received", "\(syncViewModel.eventsReceived)", systemColor: .secondary)
             }
             
             // Action buttons
             HStack(spacing: 12) {
-                if shadowBLEManager.isScanning {
-                    Button("Stop Scanning") {
-                        shadowBLEManager.stopScanning()
+                if syncViewModel.isActive {
+                    Button("Stop Sync") {
+                        syncViewModel.stop()
                     }
                     .buttonStyle(ShadowButtonStyle(color: .orange))
                 } else {
-                    Button("Start Scanning") {
-                        shadowBLEManager.startScanning()
+                    Button("Start Sync") {
+                        syncViewModel.start()
                     }
                     .buttonStyle(ShadowButtonStyle(color: .blue))
                 }
                 
-                if shadowBLEManager.connectedDevice != nil {
-                    Button("Disconnect") {
-                        shadowBLEManager.disconnect()
-                    }
-                    .buttonStyle(ShadowButtonStyle(color: .red))
+                Button("Refresh Data") {
+                    recentEvents = syncViewModel.getRecentEvents()
                 }
+                .buttonStyle(ShadowButtonStyle(color: .green))
             }
         }
         .padding()
@@ -138,6 +135,10 @@ struct ShadowDashboardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(.ultraThinMaterial)
         )
+        .onAppear {
+            syncViewModel.start()
+            recentEvents = syncViewModel.getRecentEvents()
+        }
     }
     
     private var recentEventsSection: some View {
@@ -154,7 +155,7 @@ struct ShadowDashboardView: View {
                 
                 Spacer()
                 
-                Text("\(shadowBLEManager.totalEventsReceived) events")
+                Text("\(recentEvents.count) events")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
                     .padding(.horizontal, 8)
@@ -166,11 +167,11 @@ struct ShadowDashboardView: View {
             }
             
             VStack(spacing: 8) {
-                ForEach(Array(shadowBLEManager.foundShadowDevices.prefix(3))) { device in
-                    RecentEventRow(device: device)
+                ForEach(Array(recentEvents.prefix(3)), id: \.objectID) { event in
+                    RecentStressEventRow(event: event)
                 }
                 
-                if shadowBLEManager.foundShadowDevices.isEmpty {
+                if recentEvents.isEmpty {
                     Text("No recent activity")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.6))
@@ -207,8 +208,8 @@ struct ShadowDashboardView: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(shadowBLEManager.debugLog.suffix(3))) { logEntry in
-                    Text(logEntry.formattedMessage)
+                ForEach(Array(syncViewModel.log.suffix(3)), id: \.self) { logEntry in
+                    Text(logEntry)
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
                         .padding(.horizontal, 8)
@@ -219,7 +220,7 @@ struct ShadowDashboardView: View {
                         )
                 }
                 
-                if shadowBLEManager.debugLog.isEmpty {
+                if syncViewModel.log.isEmpty {
                     Text("No debug messages")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.6))
@@ -241,7 +242,7 @@ struct ShadowDashboardView: View {
                 .fill(systemStatusColor)
                 .frame(width: 8, height: 8)
             
-            Text(shadowBLEManager.connectionStatus)
+            Text(syncViewModel.stateText)
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.8))
         }
@@ -254,12 +255,11 @@ struct ShadowDashboardView: View {
     }
     
     private var systemStatusColor: Color {
-        switch shadowBLEManager.currentSystemStatus {
-        case .synchronizing:
-            return .green
-        case .scanning, .connecting:
+        if syncViewModel.isActive {
             return .orange
-        case .disconnected:
+        } else if syncViewModel.stateText == "Up to Date" {
+            return .green
+        } else {
             return .gray
         }
     }
@@ -287,15 +287,15 @@ struct ShadowDashboardView: View {
 }
 
 struct ShadowDebugLogView: View {
-    @ObservedObject var shadowBLEManager: ShadowBLEManager
+    @ObservedObject var syncViewModel: SyncDashboardViewModel
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(shadowBLEManager.debugLog) { logEntry in
-                        Text(logEntry.formattedMessage)
+                    ForEach(syncViewModel.log, id: \.self) { logEntry in
+                        Text(logEntry)
                             .font(.caption)
                             .foregroundColor(.primary)
                             .textSelection(.enabled)
@@ -307,7 +307,7 @@ struct ShadowDebugLogView: View {
                             )
                     }
                     
-                    if shadowBLEManager.debugLog.isEmpty {
+                    if syncViewModel.log.isEmpty {
                         Text("No debug messages")
                             .font(.body)
                             .foregroundColor(.secondary)
@@ -327,7 +327,7 @@ struct ShadowDebugLogView: View {
                 
                 ToolbarItem(placement: .primaryAction) {
                     Button("Clear") {
-                        shadowBLEManager.clearDebugLog()
+                        // Clear handled by the logger itself
                     }
                 }
             }
@@ -381,44 +381,3 @@ struct ShadowButtonStyle: ButtonStyle {
     }
 }
 
-struct RecentEventRow: View {
-    let device: DiscoveredShadowDevice
-    
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(device.advertisedState == .synchronizing ? .green : .gray)
-                .frame(width: 10, height: 10)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(device.advertisedState.displayName)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                
-                Text("Sequence \(device.advertisedSequence)")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
-            }
-            
-            Spacer()
-            
-            Text(timeAgo(device.lastSeen))
-                .font(.caption2)
-                .foregroundColor(.white.opacity(0.6))
-        }
-        .padding(.vertical, 4)
-    }
-    
-    private func timeAgo(_ date: Date) -> String {
-        let interval = Date().timeIntervalSince(date)
-        
-        if interval < 60 {
-            return "\(Int(interval))s ago"
-        } else if interval < 3600 {
-            return "\(Int(interval / 60))m ago"
-        } else {
-            return "\(Int(interval / 3600))h ago"
-        }
-    }
-}
