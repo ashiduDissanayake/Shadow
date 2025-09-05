@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		70FF29BA2E6AEC310051965B /* AppModel.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 70FF29B82E6AEC310051965B /* AppModel.xcdatamodeld */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		70E004652E52AB4300A3A46D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		70E004532E52AB4100A3A46D /* Shadow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shadow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		70E004642E52AB4300A3A46D /* ShadowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShadowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		70E0046E2E52AB4300A3A46D /* ShadowUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShadowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		70FF29B92E6AEC310051965B /* AppModel.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = AppModel.xcdatamodel; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -88,6 +93,7 @@
 		70E0044A2E52AB4100A3A46D = {
 			isa = PBXGroup;
 			children = (
+				70FF29B82E6AEC310051965B /* AppModel.xcdatamodeld */,
 				70E004552E52AB4100A3A46D /* Shadow */,
 				70E004672E52AB4300A3A46D /* ShadowTests */,
 				70E004712E52AB4300A3A46D /* ShadowUITests */,
@@ -251,6 +257,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				70FF29BA2E6AEC310051965B /* AppModel.xcdatamodeld in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -566,6 +573,19 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCVersionGroup section */
+		70FF29B82E6AEC310051965B /* AppModel.xcdatamodeld */ = {
+			isa = XCVersionGroup;
+			children = (
+				70FF29B92E6AEC310051965B /* AppModel.xcdatamodel */,
+			);
+			currentVersion = 70FF29B92E6AEC310051965B /* AppModel.xcdatamodel */;
+			path = AppModel.xcdatamodeld;
+			sourceTree = "<group>";
+			versionGroupType = wrapper.xcdatamodel;
+		};
+/* End XCVersionGroup section */
 	};
 	rootObject = 70E0044B2E52AB4100A3A46D /* Project object */;
 }

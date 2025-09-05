@@ -20,8 +20,10 @@ final class SyncDashboardViewModel: ObservableObject {
         return d
     }()
     
-    init(manager: LightShadowBLEManager = LightShadowBLEManager()) {
-        self.manager = manager
+    // NOTE: manager param is optional; default nil avoids calling a MainActor init
+    // from a nonisolated default parameter context.
+    init(manager: LightShadowBLEManager? = nil) {
+        self.manager = manager ?? LightShadowBLEManager()
         setupBindings()
     }
     
@@ -68,6 +70,7 @@ final class SyncDashboardViewModel: ObservableObject {
             .assign(to: &$eventsReceived)
     }
     
+    // MARK: - UI Actions
     func start() {
         manager.start()
         log.append("[UI] Start requested")
@@ -78,6 +81,7 @@ final class SyncDashboardViewModel: ObservableObject {
         log.append("[UI] Stop requested")
     }
     
+    // MARK: - Data Access
     func getRecentEvents(limit: Int = 50) -> [StressEvent] {
         StressDataRepository.shared.recentEvents(limit: limit)
     }

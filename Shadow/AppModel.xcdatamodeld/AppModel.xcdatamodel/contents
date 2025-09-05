@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23605" systemVersion="24G210" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23605" systemVersion="24G217" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="Event" representedClassName="Event" syncable="YES" codeGenerationType="class">
         <attribute name="customField" optional="YES" attributeType="String"/>
         <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -11,23 +11,28 @@
         <relationship name="userProfile" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProfile" inverseName="events" inverseEntity="UserProfile"/>
     </entity>
     <entity name="ShadowDevice" representedClassName="ShadowDevice" syncable="YES" codeGenerationType="class">
-        <attribute name="deviceIdentifier" attributeType="String"/>
+        <attribute name="deviceIdentifier" optional="YES" attributeType="String"/>
         <attribute name="deviceName" optional="YES" attributeType="String"/>
+        <attribute name="epoch" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="lastConnectedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="lastKnownSequence" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="lastKnownState" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <relationship name="stressEvents" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="StressEvent" inverseName="device" inverseEntity="StressEvent"/>
+        <attribute name="lastKnownSequence" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lastKnownState" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lastReplayDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="resetCounter" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="stressEvents" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="StressEvent" inverseName="device" inverseEntity="StressEvent"/>
         <relationship name="userProfile" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProfile" inverseName="shadowDevices" inverseEntity="UserProfile"/>
     </entity>
     <entity name="StressEvent" representedClassName="StressEvent" syncable="YES" codeGenerationType="class">
-        <attribute name="batteryVoltage" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="confidenceScore" optional="YES" attributeType="Float" defaultValueString="0.0" usesScalarValueType="YES"/>
-        <attribute name="durationPrevState" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="receivedTimestamp" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="sensorQuality" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="sequenceNumber" attributeType="Integer 16" usesScalarValueType="YES"/>
-        <attribute name="stressState" attributeType="Integer 16" usesScalarValueType="YES"/>
-        <attribute name="timestamp" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="epoch" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="eventType" optional="YES" attributeType="String"/>
+        <attribute name="isSynthetic" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="receivedTimestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="resetCounter" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="sequenceNumber" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="stressState" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="device" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ShadowDevice" inverseName="stressEvents" inverseEntity="ShadowDevice"/>
     </entity>
     <entity name="UserProfile" representedClassName="UserProfile" syncable="YES" codeGenerationType="class">
