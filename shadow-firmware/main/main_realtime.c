@@ -91,7 +91,7 @@ void on_stress_transition(const stress_state_transition_t *transition);
 
 /* ================= MOCK SENSOR GENERATORS (fixed-point safe) ================= */
 
-static int32_t generate_mock_bvp_int(void) {
+static int32_t  generate_mock_bvp_int(void) {
     static int32_t base_bvp_int = 5320; /* 53.20 * 100 */
     static uint32_t counter = 0;
     counter++;
