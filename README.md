@@ -30,21 +30,26 @@
 
 ## Current Status
 
-### Week 7: TinyML Deployment & Notification System (Current)
-- 🔄 **TinyML Model Deployment**: Deploying ExtraTreeClassifier on ESP32-S3 using TensorFlow Lite Micro
-- 🔄 **Intelligent Notification Engine**: Implementing smart notification generation system for macOS app
-- 🔄 **Real-time Inference Pipeline**: Building on-device ML inference with multi-sensor data fusion
-- 🔄 **macOS App Finalization**: Completing notification delivery and user interaction features
+### Week 8: Intelligent Notification System (Current)
+- 🔄 **Notification Generation Algorithm**: Developing intelligent stress management message generation
+- 🔄 **Notification Scheduling System**: Implementing adaptive notification timing based on stress patterns
+- 🔄 **User Interaction Framework**: Building feedback mechanisms for notification effectiveness
+- 🔄 **macOS Notification Integration**: Finalizing notification delivery and user interaction features
+
+### Week 7: Deployment on ESP32-S3 & macOS Integration (Completed)
+- ✅ **Model Deployment**: Successfully deployed MLP on ESP32-S3 using a custom pipeline
+- ✅ **Real-time Inference Pipeline**: Built on-device ML inference with multi-sensor data fusion
+- ✅ **macOS App Integration**: Completed end-to-end communication between ESP32 and macOS app
+- ✅ **Stress Detection Pipeline**: Established complete stress detection workflow from sensors to macOS
 
 ### Week 6: macOS Host Application (Completed)
 - ✅ **Complete macOS Application**: Swift-based companion application with full UI/UX
 - ✅ **BLE Communication Stack**: Implemented robust Bluetooth Low Energy communication protocol
 - ✅ **Data Processing Pipeline**: Built comprehensive data preprocessing and analysis framework
-- ✅ **Screen Usage Integration**: Integrated screen time monitoring for contextual stress analysis
 - ✅ **Core App Architecture**: Established modular app structure with real-time data handling
 
-### Week 5: Model Finalization & TinyML Integration (Completed)
-- ✅ **ExtraTreeClassifier Optimization**: Achieved required performance with ExtraTreeClassifier (no H-CNN needed)
+### Week 5: Model Finalization & Integration (Completed)
+- ✅ **ExtraTreeClassifier Optimization**: Achieved required performance with ExtraTreeClassifier (no H-CNN needed) - Laterchanged to MLP model
 - ✅ **Model Architecture**: Finalized and optimized ML model structure with satisfactory accuracy
 - ✅ **Multi-Sensor Integration**: Three physiological sensors integrated with ESP32-S3
 - ✅ **Real-time Data Acquisition**: 5 physiological parameters collected without latency
@@ -89,51 +94,52 @@
 
 ## 12-Week Development Roadmap
 
-### ✅ Completed Weeks (1-6)
+### ✅ Completed Weeks (1-7)
 - **Week 1**: Project foundation and requirements specification
 - **Week 2**: Software and hardware architecture design  
 - **Week 3**: Device compatibility analysis and documentation
 - **Week 4**: AI/ML model development with WESAD dataset
 - **Week 5**: Model finalization with ExtraTreeClassifier optimization
 - **Week 6**: Complete macOS application with BLE communication and data processing
+- **Week 7**: TinyML deployment on ESP32-S3 and end-to-end macOS integration
 
-### 🔄 Current Focus (Week 7)
-**TinyML Deployment & Intelligent Notifications**
-- Deploying optimized ExtraTreeClassifier model on ESP32-S3 using TensorFlow Lite Micro
-- Implementing intelligent notification generation system in macOS app
-- Building real-time ML inference pipeline with multi-sensor data fusion
-- Creating personalized stress management message generation
-- Finalizing end-to-end communication between ESP32 and macOS app
+### 🔄 Current Focus (Week 8)
+**Intelligent Notification System**
+- Developing notification generation algorithm for personalized stress management messages
+- Implementing adaptive notification scheduling based on stress patterns and user context
+- Building user feedback mechanisms for notification effectiveness optimization
+- Creating contextual awareness integration with screen usage and physiological data
+- Finalizing macOS notification center integration and user interaction flows
 
 ### ⏳ Upcoming Development Phase
 
-**Week 8 - 9: Real-time Stress Detection & Feedback**
-- Complete end-to-end stress detection pipeline (ESP32 → macOS)
-- Implement adaptive notification timing based on stress patterns
-- Develop contextual awareness using screen usage and physiological data
-- Build user feedback mechanisms for notification effectiveness
-- Optimize power consumption on ESP32-S3 for continuous monitoring
+**Week 9: Advanced Notification Analytics**
+- Implement machine learning-based notification timing optimization
+- Develop personalized stress triggers identification and response patterns
+- Create adaptive notification frequency based on user responsiveness
+- Build comprehensive notification effectiveness tracking and analytics
+- Optimize notification content generation based on stress severity and context
 
 **Week 10: Advanced Analytics & Personalization**
-- Implement trend analysis and pattern recognition
-- Develop personalized stress triggers identification
-- Create adaptive thresholds based on user behavior
-- Build comprehensive wellness dashboard in macOS app
-- Implement data export and privacy controls
+- Implement trend analysis and pattern recognition for long-term wellness insights
+- Develop personalized stress management recommendations
+- Create adaptive thresholds based on individual user behavior patterns
+- Build comprehensive wellness dashboard with historical data visualization
+- Implement data export capabilities and enhanced privacy controls
 
 **Week 11: Testing & Optimization**
-- Comprehensive system testing and validation
-- Performance benchmarking and accuracy improvements
+- Comprehensive system testing and validation across all components
+- Performance benchmarking for TinyML inference and notification delivery
 - User experience testing and interface refinement
-- Security audit and privacy verification
-- Documentation of testing results and performance metrics
+- Security audit and privacy verification protocols
+- Documentation of testing results and performance optimization metrics
 
 **Week 12: Final Integration & Open Source Release**
-- Complete ecosystem integration testing
-- Finalize documentation and user guides
-- Prepare open-source release with contribution guidelines
-- Create demo videos and tutorial content
-- Community outreach and project presentation
+- Complete ecosystem integration testing and validation
+- Finalize comprehensive documentation and user installation guides
+- Prepare open-source release with detailed contribution guidelines
+- Create demonstration videos and comprehensive tutorial content
+- Community outreach, project presentation, and open-source launch
 
 ---
 
@@ -142,7 +148,7 @@
 ### Hardware Components
 - **ESP32-S3**: Main processing unit with TinyML capabilities
 - **MAX30102**: Heart rate and SpO2 sensor
-- **MPU9250**: 9-axis motion sensor
+- **MPU6050**: 6-axis motion sensor
 - **GSR Grove**: Galvanic skin response sensor
 - **MLX90614**: Non-contact temperature sensor
 
@@ -155,42 +161,43 @@
 - **Notification Engine**: Intelligent stress management messaging system
 
 ### Current Capabilities
-- Complete macOS companion application with full UI
-- Real-time acquisition of 5 physiological parameters
-- BLE communication stack with robust error handling
-- Screen usage monitoring and contextual analysis
-- Optimized ML model ready for TinyML deployment
-- Multi-sensor data fusion architecture
-- Intelligent notification timing and personalization
+- Complete macOS companion application with full UI and BLE integration
+- Real-time acquisition of 5 physiological parameters via ESP32-S3
+- TinyML stress detection with ExtraTreeClassifier deployed on-device
+- End-to-end stress detection pipeline from sensors to macOS app
+- BLE communication stack with robust error handling and data streaming
+- Screen usage monitoring and contextual analysis integration
+- Multi-sensor data fusion architecture with real-time inference
+- Foundation for intelligent notification system implementation
 
 ---
 
-## Week 7 Focus Areas
+## Week 8 Focus Areas
 
 ### 🎯 Primary Objectives
-1. **TinyML Model Deployment**
-   - Convert ExtraTreeClassifier to TensorFlow Lite Micro format
-   - Implement model inference on ESP32-S3
-   - Optimize memory usage and inference speed
-   - Test real-time stress classification accuracy
+1. **Notification Generation Algorithm**
+   - Develop intelligent stress management message generation
+   - Create personalized notification content based on stress levels
+   - Implement contextual message selection algorithms
+   - Build notification content library and categorization system
 
-2. **macOS App Notification System**
-   - Implement intelligent notification delivery
-   - Create personalized stress management messages
-   - Build adaptive notification timing algorithms
-   - Integrate with macOS notification center
+2. **Notification Scheduling System**
+   - Implement adaptive notification timing based on stress patterns
+   - Create user context-aware notification delivery
+   - Build notification frequency optimization algorithms
+   - Integrate with user activity and availability detection
 
-3. **End-to-End Integration**
-   - Complete ESP32 to macOS data pipeline
-   - Test real-time stress detection workflow
-   - Validate BLE communication stability
-   - Ensure low-latency inference and notifications
+3. **macOS Notification Integration**
+   - Complete macOS notification center integration
+   - Implement user interaction and feedback collection
+   - Build notification effectiveness tracking system
+   - Create user preference and customization options
 
-4. **System Optimization**
-   - Power consumption optimization on ESP32
-   - Memory usage optimization for TinyML model
-   - Notification effectiveness and user experience
-   - Real-time performance tuning
+4. **System Optimization & Testing**
+   - Test notification delivery reliability and timing accuracy
+   - Optimize notification algorithm performance
+   - Validate user experience and interaction flows
+   - Ensure seamless integration with existing stress detection pipeline
 
 ---
 
@@ -203,7 +210,8 @@
 - **Week 4**: [`deliverables/week4/`](deliverables/week4/) - AI/ML models
 - **Week 5**: [`deliverables/week5/`](deliverables/week5/) - ExtraTreeClassifier optimization and TinyML integration
 - **Week 6**: [`deliverables/week6/`](deliverables/week6/) - Complete macOS application and BLE implementation
-- **Week 7**: [`deliverables/week7/`](deliverables/week7/) - TinyML deployment and notification system
+- **Week 7**: [`deliverables/week7/`](deliverables/week7/) - TinyML deployment and end-to-end system integration
+- **Week 8**: [`deliverables/week8/`](deliverables/week8/) - Intelligent notification system and scheduling algorithms
 - **AI Models**: [`models/`](models/) - Complete AI model development and deployment structure
 
 ### Research Papers
