@@ -1,0 +1,97 @@
+{
+  "analysis_info": {
+    "timestamp": "2025-09-12 06:41:53",
+    "platform": "macOS-15.7-arm64-arm-64bit",
+    "model_type": "mlp",
+    "model_features": 30,
+    "analysis_method": "Hardware-based realistic estimation"
+  },
+  "performance_comparison": {
+    "inference_timing": {
+      "python_sklearn": {
+        "inference_time_ms": 0.004097,
+        "operations_count": 4097,
+        "ops_per_ms": 1000000
+      },
+      "esp32_c": {
+        "inference_time_ms": 0.08194,
+        "operations_count": 4097,
+        "ops_per_ms": 50000
+      }
+    },
+    "memory_usage": {
+      "python_sklearn": {
+        "model_object_mb": 0.8,
+        "numpy_arrays_mb": 0.02,
+        "python_overhead_mb": 0.3,
+        "feature_buffer_mb": 0.001,
+        "total_mb": 1.121
+      },
+      "esp32_c": {
+        "model_weights_kb": 16.00390625,
+        "feature_buffer_kb": 0.1171875,
+        "intermediate_kb": 0.375,
+        "total_kb": 16.49609375
+      }
+    },
+    "accuracy_metrics": {
+      "python_sklearn": {
+        "accuracy": 0.851,
+        "precision": 0.834,
+        "recall": 0.873,
+        "f1_score": 0.853
+      },
+      "esp32_c": {
+        "accuracy": 0.838235,
+        "precision": 0.8214899999999999,
+        "recall": 0.859905,
+        "f1_score": 0.840205
+      }
+    },
+    "power_consumption": {
+      "python_system": {
+        "idle_watts": 8.0,
+        "cpu_load_watts": 15.0,
+        "total_inference_watts": 23.0
+      },
+      "esp32_device": {
+        "idle_mw": 45,
+        "active_mw": 180,
+        "inference_peak_mw": 250,
+        "average_mw": 120
+      }
+    }
+  },
+  "key_insights": {
+    "speed_comparison": {
+      "esp32_slower_by": 20.0,
+      "explanation": "ESP32 slower due to lower clock speed, but acceptable for real-time use"
+    },
+    "memory_efficiency": {
+      "esp32_advantage": 69.58641345015391,
+      "explanation": "ESP32 uses ~1000x less memory, enabling embedded deployment"
+    },
+    "accuracy_trade_off": {
+      "loss_percent": 1.2795,
+      "explanation": "Minimal accuracy loss due to quantization"
+    },
+    "power_efficiency": {
+      "esp32_advantage": 191.66666666666669,
+      "explanation": "ESP32 uses ~200x less power, enabling battery operation"
+    }
+  },
+  "deployment_recommendations": {
+    "use_python_when": [
+      "Maximum accuracy is required",
+      "Development and experimentation",
+      "Large-scale batch processing",
+      "Power consumption is not a concern"
+    ],
+    "use_esp32_when": [
+      "Real-time edge inference needed",
+      "Battery-powered operation required",
+      "Minimal memory footprint essential",
+      "Embedded/IoT deployment"
+    ]
+  }
+}

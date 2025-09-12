@@ -10,6 +10,7 @@ struct ShadowDashboardView: View {
     let onShowProfile: () -> Void
     
     @State private var showingDebugLog = false
+    @State private var showingCoreDataDebug = false
     @State private var recentEvents: [StressEvent] = []
     
     var body: some View {
@@ -41,6 +42,9 @@ struct ShadowDashboardView: View {
         )
         .sheet(isPresented: $showingDebugLog) {
             ShadowDebugLogView(syncViewModel: syncViewModel)
+        }
+        .sheet(isPresented: $showingCoreDataDebug) {
+            CoreDataDebugView()
         }
         .onAppear {
             syncViewModel.start()
@@ -164,40 +168,49 @@ struct ShadowDashboardView: View {
         )
     }
     
-    // MARK: Debug Section
+        // MARK: Debug Section
     private var debugSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "terminal")
-                    .font(.title3)
-                    .foregroundColor(.purple)
-                Text("System Debug")
+                Image(systemName: "ladybug")
+                    .font(.title2)
+                    .foregroundColor(.orange)
+                Text("Debug Tools")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                 Spacer()
-                Button("View Full Log") { showingDebugLog = true }
-                    .buttonStyle(ShadowButtonStyle(color: .purple, size: .small))
             }
             
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(syncViewModel.log.suffix(3).enumerated()), id: \.offset) { _, line in
-                    Text(line)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.85))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(.black.opacity(0.3))
-                        )
+            VStack(spacing: 8) {
+                Button(action: { showingDebugLog = true }) {
+                    HStack {
+                        Image(systemName: "doc.text")
+                        Text("BLE Debug Log")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.blue.opacity(0.2))
+                    )
                 }
                 
-                if syncViewModel.log.isEmpty {
-                    Text("No debug messages")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
-                        .italic()
+                Button(action: { showingCoreDataDebug = true }) {
+                    HStack {
+                        Image(systemName: "cylinder.split.1x2")
+                        Text("Core Data Manager")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.purple.opacity(0.2))
+                    )
                 }
             }
         }

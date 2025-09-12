@@ -1,0 +1,27 @@
+============================================================
+ESP32 SHADOW: FEATURE SELECTION SUMMARY
+============================================================
+📊 FINAL RESULTS:
+   • Selected Features: 30
+   • F1 Score: 0.804 ± 0.177
+   • MCC: 0.744
+   • ROC AUC: 0.953
+   • Statistical Significance: p < 0.000
+
+🔬 SIGNAL DISTRIBUTION:
+   • BVP (Heart Rate): 4 features (13.3%)
+   • Accelerometer: 15 features (50.0%)
+   • EDA (Skin): 6 features (20.0%)
+   • Temperature: 5 features (16.7%)
+
+⭐ TOP 10 MOST STABLE FEATURES:
+    1. BVP_perm_entropy          (15/15 = 100.0%)
+    2. ACC_y_perm_entropy        (15/15 = 100.0%)
+    3. ACC_l2_max                (15/15 = 100.0%)
+    4. ACC_y_lineintegral        (15/15 = 100.0%)
+    5. ACC_z_energy              (15/15 = 100.0%)
+    6. ACC_y_peaks               (15/15 = 100.0%)
+    7. TEMP_l2_min               (14/15 = 93.3%)
+    8. ACC_z_rms                 (14/15 = 93.3%)
+    9. ACC_z_pct_95              (14/15 = 93.3%)
+   10. EDA_l2_iqr_5_95           (14/15 = 93.3%)

@@ -5,8 +5,10 @@ import CoreData
 final class StressDataRepository {
     static let shared = StressDataRepository()
     
-    // Single-device convenience. Replace with real peripheral UUID if needed.
-    let defaultDeviceUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    // Dynamic device UUID - creates one if none exists, supports multiple devices
+    lazy var defaultDeviceUUID: UUID = {
+        return CoreDataReset.getOrCreateDefaultDeviceUUID()
+    }()
     
     private let container: NSPersistentContainer
     private var context: NSManagedObjectContext { container.viewContext }

@@ -20,7 +20,7 @@
         "pr_auc": 0.9609781646899787,
         "brier_score": 0.07010070621468927,
         "optimal_threshold": 0.38,
-        "training_time_sec": 0.12337600000319071,
+        "training_time_sec": 0.11764808300358709,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -50,8 +50,8 @@
             "support": 177.0
           }
         },
-        "inference_time_ms": 1.2374167003144976,
-        "model_size_mb": 5.868163108825684
+        "inference_time_ms": 1.3473625003825873,
+        "model_size_mb": 5.868162155151367
       },
       "optimal_threshold": 0.38
     },
@@ -75,7 +75,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.07787064606741573,
         "optimal_threshold": 0.425,
-        "training_time_sec": 0.1089137090020813,
+        "training_time_sec": 0.10643266599799972,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -105,8 +105,8 @@
             "support": 178.0
           }
         },
-        "inference_time_ms": 1.3494416998582892,
-        "model_size_mb": 5.445592880249023
+        "inference_time_ms": 1.3481125002726912,
+        "model_size_mb": 5.445591926574707
       },
       "optimal_threshold": 0.425
     },
@@ -130,7 +130,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.011007916666666666,
         "optimal_threshold": 0.47,
-        "training_time_sec": 0.11071366700343788,
+        "training_time_sec": 0.10897529199428391,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -160,8 +160,8 @@
             "support": 180.0
           }
         },
-        "inference_time_ms": 1.3882291998015717,
-        "model_size_mb": 6.199358940124512
+        "inference_time_ms": 1.2873250001575798,
+        "model_size_mb": 6.199357986450195
       },
       "optimal_threshold": 0.47
     },
@@ -185,7 +185,7 @@
         "pr_auc": 0.9835498818134889,
         "brier_score": 0.09558695652173914,
         "optimal_threshold": 0.42,
-        "training_time_sec": 0.1268686660041567,
+        "training_time_sec": 0.10813312500249594,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -215,8 +215,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 1.3531791999412235,
-        "model_size_mb": 5.598361968994141
+        "inference_time_ms": 1.3424707998638041,
+        "model_size_mb": 5.598361015319824
       },
       "optimal_threshold": 0.42
     },
@@ -240,7 +240,7 @@
         "pr_auc": 0.9645528186431116,
         "brier_score": 0.0815016393442623,
         "optimal_threshold": 0.53,
-        "training_time_sec": 0.10985904200060759,
+        "training_time_sec": 0.10554229198896792,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -270,8 +270,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 1.3199667002481874,
-        "model_size_mb": 5.51487922668457
+        "inference_time_ms": 1.3456458007567562,
+        "model_size_mb": 5.514878273010254
       },
       "optimal_threshold": 0.53
     },
@@ -295,7 +295,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.10639754098360657,
         "optimal_threshold": 0.475,
-        "training_time_sec": 0.10836833400389878,
+        "training_time_sec": 0.10963916599575896,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -325,8 +325,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 1.2550082996312995,
-        "model_size_mb": 5.353717803955078
+        "inference_time_ms": 1.2856290995841846,
+        "model_size_mb": 5.353716850280762
       },
       "optimal_threshold": 0.475
     },
@@ -350,7 +350,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.04564035326086957,
         "optimal_threshold": 0.52,
-        "training_time_sec": 0.10931875000096625,
+        "training_time_sec": 0.10680575000878889,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -380,8 +380,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 1.3501417000952642,
-        "model_size_mb": 5.903600692749023
+        "inference_time_ms": 1.3754375002463348,
+        "model_size_mb": 5.903599739074707
       },
       "optimal_threshold": 0.52
     },
@@ -405,7 +405,7 @@
         "pr_auc": 0.9999999999999997,
         "brier_score": 0.11763306010928963,
         "optimal_threshold": 0.495,
-        "training_time_sec": 0.10999129199626623,
+        "training_time_sec": 0.11045791600190569,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -435,8 +435,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 1.3525542002753355,
-        "model_size_mb": 5.487113952636719
+        "inference_time_ms": 3.9387749988236465,
+        "model_size_mb": 5.487112998962402
       },
       "optimal_threshold": 0.495
     },
@@ -460,7 +460,7 @@
         "pr_auc": 0.997522891449832,
         "brier_score": 0.10679384816753926,
         "optimal_threshold": 0.475,
-        "training_time_sec": 0.10728291699342662,
+        "training_time_sec": 0.1051618750061607,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -490,8 +490,8 @@
             "support": 191.0
           }
         },
-        "inference_time_ms": 1.3528874995245133,
-        "model_size_mb": 5.41461181640625
+        "inference_time_ms": 1.3356416005990468,
+        "model_size_mb": 5.414610862731934
       },
       "optimal_threshold": 0.475
     },
@@ -515,7 +515,7 @@
         "pr_auc": 0.9999999999999999,
         "brier_score": 0.061512499999999984,
         "optimal_threshold": 0.505,
-        "training_time_sec": 0.11084724999818718,
+        "training_time_sec": 0.10886329200002365,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -545,8 +545,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.1630916000285652,
-        "model_size_mb": 6.025374412536621
+        "inference_time_ms": 1.1586749998969026,
+        "model_size_mb": 6.025373458862305
       },
       "optimal_threshold": 0.505
     },
@@ -570,7 +570,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.04141635135135135,
         "optimal_threshold": 0.43,
-        "training_time_sec": 0.10862400000041816,
+        "training_time_sec": 0.10926720799761824,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -600,8 +600,8 @@
             "support": 185.0
           }
         },
-        "inference_time_ms": 1.3182833004975691,
-        "model_size_mb": 5.507108688354492
+        "inference_time_ms": 1.2534125009551644,
+        "model_size_mb": 5.507107734680176
       },
       "optimal_threshold": 0.43
     },
@@ -625,7 +625,7 @@
         "pr_auc": 0.8209823652900106,
         "brier_score": 0.15369502688172043,
         "optimal_threshold": 0.585,
-        "training_time_sec": 0.10756112499802839,
+        "training_time_sec": 0.11029620900808368,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -655,8 +655,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.3484707997122314,
-        "model_size_mb": 5.662920951843262
+        "inference_time_ms": 1.3518916995963082,
+        "model_size_mb": 5.662919998168945
       },
       "optimal_threshold": 0.585
     },
@@ -680,7 +680,7 @@
         "pr_auc": 0.96176419639415,
         "brier_score": 0.0942557486631016,
         "optimal_threshold": 0.39,
-        "training_time_sec": 0.10726866700133542,
+        "training_time_sec": 0.10839666600804776,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -710,8 +710,8 @@
             "support": 187.0
           }
         },
-        "inference_time_ms": 1.3034666997555178,
-        "model_size_mb": 5.845597267150879
+        "inference_time_ms": 1.3201541994931176,
+        "model_size_mb": 5.8455963134765625
       },
       "optimal_threshold": 0.39
     },
@@ -735,7 +735,7 @@
         "pr_auc": 0.9999999999999999,
         "brier_score": 0.016724865591397846,
         "optimal_threshold": 0.45,
-        "training_time_sec": 0.1054489169982844,
+        "training_time_sec": 0.10566291600116529,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -765,8 +765,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.3671166001586244,
-        "model_size_mb": 5.969818115234375
+        "inference_time_ms": 1.3439625006867573,
+        "model_size_mb": 5.969817161560059
       },
       "optimal_threshold": 0.45
     },
@@ -790,7 +790,7 @@
         "pr_auc": 0.8694343137824175,
         "brier_score": 0.13375591397849462,
         "optimal_threshold": 0.42,
-        "training_time_sec": 0.1068873340045684,
+        "training_time_sec": 0.10786558299150784,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -820,8 +820,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.344720799534116,
-        "model_size_mb": 5.061313629150391
+        "inference_time_ms": 1.335133399697952,
+        "model_size_mb": 5.061312675476074
       },
       "optimal_threshold": 0.42
     }
@@ -847,7 +847,7 @@
         "pr_auc": 0.9690788081892959,
         "brier_score": 0.06600423728813559,
         "optimal_threshold": 0.44,
-        "training_time_sec": 0.25378441700013354,
+        "training_time_sec": 0.21551199999521486,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -877,8 +877,8 @@
             "support": 177.0
           }
         },
-        "inference_time_ms": 1.2925582996103913,
-        "model_size_mb": 2.006101608276367
+        "inference_time_ms": 1.3502041008905508,
+        "model_size_mb": 2.006100654602051
       },
       "optimal_threshold": 0.44
     },
@@ -902,7 +902,7 @@
         "pr_auc": 0.9425986857620104,
         "brier_score": 0.12105112359550561,
         "optimal_threshold": 0.605,
-        "training_time_sec": 0.20378270800574683,
+        "training_time_sec": 0.20335208300093655,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -932,8 +932,8 @@
             "support": 178.0
           }
         },
-        "inference_time_ms": 1.351791600609431,
-        "model_size_mb": 1.8763847351074219
+        "inference_time_ms": 1.3049040993792005,
+        "model_size_mb": 1.8763837814331055
       },
       "optimal_threshold": 0.605
     },
@@ -957,7 +957,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.006196388888888888,
         "optimal_threshold": 0.395,
-        "training_time_sec": 0.20387229199695867,
+        "training_time_sec": 0.19755570898996666,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -987,8 +987,8 @@
             "support": 180.0
           }
         },
-        "inference_time_ms": 1.3457082997774705,
-        "model_size_mb": 2.07584285736084
+        "inference_time_ms": 1.348308399610687,
+        "model_size_mb": 2.0758419036865234
       },
       "optimal_threshold": 0.395
     },
@@ -1012,7 +1012,7 @@
         "pr_auc": 0.985157208959754,
         "brier_score": 0.05447051630434783,
         "optimal_threshold": 0.525,
-        "training_time_sec": 0.20559050000156276,
+        "training_time_sec": 0.20235999999567866,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1042,8 +1042,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 3.579487500246614,
-        "model_size_mb": 1.9473466873168945
+        "inference_time_ms": 1.3533624995034188,
+        "model_size_mb": 1.9473457336425781
       },
       "optimal_threshold": 0.525
     },
@@ -1067,7 +1067,7 @@
         "pr_auc": 0.9804907877949366,
         "brier_score": 0.06004084699453552,
         "optimal_threshold": 0.515,
-        "training_time_sec": 0.20307554199825972,
+        "training_time_sec": 0.19657299999380484,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1097,8 +1097,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 1.3442417002806906,
-        "model_size_mb": 1.9192705154418945
+        "inference_time_ms": 1.3411834006546997,
+        "model_size_mb": 1.9192695617675781
       },
       "optimal_threshold": 0.515
     },
@@ -1122,7 +1122,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.10001871584699455,
         "optimal_threshold": 0.515,
-        "training_time_sec": 0.20699216700450052,
+        "training_time_sec": 0.20246883398795035,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1152,8 +1152,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 1.1403291995520703,
-        "model_size_mb": 1.8550224304199219
+        "inference_time_ms": 1.3482084003044292,
+        "model_size_mb": 1.8550214767456055
       },
       "optimal_threshold": 0.515
     },
@@ -1177,7 +1177,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.04061698369565218,
         "optimal_threshold": 0.545,
-        "training_time_sec": 0.20327654199354583,
+        "training_time_sec": 0.20643366700096522,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1207,8 +1207,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 1.3496207997377496,
-        "model_size_mb": 2.041349411010742
+        "inference_time_ms": 1.146004100155551,
+        "model_size_mb": 2.041348457336426
       },
       "optimal_threshold": 0.545
     },
@@ -1232,7 +1232,7 @@
         "pr_auc": 0.9999999999999998,
         "brier_score": 0.11573989071038253,
         "optimal_threshold": 0.51,
-        "training_time_sec": 0.20603620800102362,
+        "training_time_sec": 0.20534220899571665,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1262,8 +1262,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 1.3506290997611359,
-        "model_size_mb": 1.9330034255981445
+        "inference_time_ms": 1.3511165991076268,
+        "model_size_mb": 1.9330024719238281
       },
       "optimal_threshold": 0.51
     },
@@ -1287,7 +1287,7 @@
         "pr_auc": 0.9682119460353891,
         "brier_score": 0.11205471204188479,
         "optimal_threshold": 0.595,
-        "training_time_sec": 0.20256291699479334,
+        "training_time_sec": 0.19622358299966436,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1317,8 +1317,8 @@
             "support": 191.0
           }
         },
-        "inference_time_ms": 1.3462750001053791,
-        "model_size_mb": 1.8747062683105469
+        "inference_time_ms": 1.34763749956619,
+        "model_size_mb": 1.8747053146362305
       },
       "optimal_threshold": 0.595
     },
@@ -1342,7 +1342,7 @@
         "pr_auc": 0.9698891638675797,
         "brier_score": 0.07104099462365591,
         "optimal_threshold": 0.59,
-        "training_time_sec": 0.21049175000371179,
+        "training_time_sec": 0.21176045799802523,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1372,8 +1372,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.1616083000262734,
-        "model_size_mb": 2.067450523376465
+        "inference_time_ms": 1.349616699735634,
+        "model_size_mb": 2.0674495697021484
       },
       "optimal_threshold": 0.59
     },
@@ -1397,7 +1397,7 @@
         "pr_auc": 0.9959005595938888,
         "brier_score": 0.05203175675675677,
         "optimal_threshold": 0.5,
-        "training_time_sec": 0.2042579580011079,
+        "training_time_sec": 0.2175662090012338,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1427,8 +1427,8 @@
             "support": 185.0
           }
         },
-        "inference_time_ms": 1.3532582997868303,
-        "model_size_mb": 1.9294939041137695
+        "inference_time_ms": 1.2841832998674363,
+        "model_size_mb": 1.9294929504394531
       },
       "optimal_threshold": 0.5
     },
@@ -1452,7 +1452,7 @@
         "pr_auc": 0.9211880912435491,
         "brier_score": 0.2247180107526882,
         "optimal_threshold": 0.54,
-        "training_time_sec": 0.205332792000263,
+        "training_time_sec": 0.19347683399973903,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1482,8 +1482,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.3533332996303216,
-        "model_size_mb": 1.8557853698730469
+        "inference_time_ms": 1.2494166003307328,
+        "model_size_mb": 1.8557844161987305
       },
       "optimal_threshold": 0.54
     },
@@ -1507,7 +1507,7 @@
         "pr_auc": 0.9809789148106526,
         "brier_score": 0.06598622994652405,
         "optimal_threshold": 0.495,
-        "training_time_sec": 0.21324004199414048,
+        "training_time_sec": 0.2561053750105202,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1537,8 +1537,8 @@
             "support": 187.0
           }
         },
-        "inference_time_ms": 1.3437582994811237,
-        "model_size_mb": 1.9920635223388672
+        "inference_time_ms": 1.350924999860581,
+        "model_size_mb": 1.9920625686645508
       },
       "optimal_threshold": 0.495
     },
@@ -1562,7 +1562,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.00491008064516129,
         "optimal_threshold": 0.61,
-        "training_time_sec": 0.20628929099621018,
+        "training_time_sec": 0.20322795800166205,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1592,8 +1592,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.3487000003806315,
-        "model_size_mb": 2.07462215423584
+        "inference_time_ms": 1.3489083998138085,
+        "model_size_mb": 2.0746212005615234
       },
       "optimal_threshold": 0.61
     },
@@ -1617,7 +1617,7 @@
         "pr_auc": 0.8204369848502671,
         "brier_score": 0.18379247311827956,
         "optimal_threshold": 0.555,
-        "training_time_sec": 0.2087162499956321,
+        "training_time_sec": 0.20670695799344685,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1647,8 +1647,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 1.1720707996573765,
-        "model_size_mb": 1.7321720123291016
+        "inference_time_ms": 1.2765249994117767,
+        "model_size_mb": 1.7321710586547852
       },
       "optimal_threshold": 0.555
     }
@@ -1674,7 +1674,7 @@
         "pr_auc": 0.9761353454222104,
         "brier_score": 0.05155158184035438,
         "optimal_threshold": 0.9432707073785505,
-        "training_time_sec": 0.4534725420016912,
+        "training_time_sec": 0.45476908300770447,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1704,8 +1704,8 @@
             "support": 177.0
           }
         },
-        "inference_time_ms": 0.04748750070575625,
-        "model_size_mb": 0.47792911529541016
+        "inference_time_ms": 0.04109580040676519,
+        "model_size_mb": 0.47792816162109375
       },
       "optimal_threshold": 0.9432707073785505
     },
@@ -1729,7 +1729,7 @@
         "pr_auc": 0.996125064213212,
         "brier_score": 0.11902880994423133,
         "optimal_threshold": 0.9867230048767384,
-        "training_time_sec": 0.4387832909997087,
+        "training_time_sec": 0.43089058400073554,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1759,8 +1759,8 @@
             "support": 178.0
           }
         },
-        "inference_time_ms": 0.041858300392050296,
-        "model_size_mb": 0.47344398498535156
+        "inference_time_ms": 0.044170900946483016,
+        "model_size_mb": 0.47344303131103516
       },
       "optimal_threshold": 0.9867230048767384
     },
@@ -1784,7 +1784,7 @@
         "pr_auc": 1.0,
         "brier_score": 4.808702193484009e-10,
         "optimal_threshold": 0.9616798016304888,
-        "training_time_sec": 0.44499754199932795,
+        "training_time_sec": 0.4321445409877924,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1814,8 +1814,8 @@
             "support": 180.0
           }
         },
-        "inference_time_ms": 0.04392499977257103,
-        "model_size_mb": 0.4797658920288086
+        "inference_time_ms": 0.04227089957566932,
+        "model_size_mb": 0.4797649383544922
       },
       "optimal_threshold": 0.9616798016304888
     },
@@ -1839,7 +1839,7 @@
         "pr_auc": 0.9978722763138617,
         "brier_score": 0.015415441971677785,
         "optimal_threshold": 0.9416998082971411,
-        "training_time_sec": 0.4443994999965071,
+        "training_time_sec": 0.4284356660064077,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1869,8 +1869,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.04404580031405203,
-        "model_size_mb": 0.4752788543701172
+        "inference_time_ms": 0.0596500001847744,
+        "model_size_mb": 0.4752779006958008
       },
       "optimal_threshold": 0.9416998082971411
     },
@@ -1894,7 +1894,7 @@
         "pr_auc": 0.9781185750981711,
         "brier_score": 0.06330703175750174,
         "optimal_threshold": 0.8947888380595962,
-        "training_time_sec": 0.4408124580004369,
+        "training_time_sec": 0.4363019590091426,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1924,8 +1924,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.04379999954835512,
-        "model_size_mb": 0.4779682159423828
+        "inference_time_ms": 0.0472707994049415,
+        "model_size_mb": 0.4779672622680664
       },
       "optimal_threshold": 0.8947888380595962
     },
@@ -1949,7 +1949,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.18276458453520553,
         "optimal_threshold": 0.8184285306715173,
-        "training_time_sec": 0.43878062500152737,
+        "training_time_sec": 0.4764996669982793,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -1979,8 +1979,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.04687920009018853,
-        "model_size_mb": 0.4735403060913086
+        "inference_time_ms": 0.04278330015949905,
+        "model_size_mb": 0.4735393524169922
       },
       "optimal_threshold": 0.8184285306715173
     },
@@ -2004,7 +2004,7 @@
         "pr_auc": 0.999780509218613,
         "brier_score": 0.006899269866182174,
         "optimal_threshold": 0.8140481094615466,
-        "training_time_sec": 0.44113908300641924,
+        "training_time_sec": 0.44423112500226125,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2034,8 +2034,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.04353749973233789,
-        "model_size_mb": 0.47872066497802734
+        "inference_time_ms": 0.0549625008716248,
+        "model_size_mb": 0.47871971130371094
       },
       "optimal_threshold": 0.8140481094615466
     },
@@ -2059,7 +2059,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.17200970517284508,
         "optimal_threshold": 0.4551242449372687,
-        "training_time_sec": 0.4390609999973094,
+        "training_time_sec": 0.43796708300942555,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2089,8 +2089,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.046512499829987064,
-        "model_size_mb": 0.4752836227416992
+        "inference_time_ms": 0.05459579988382757,
+        "model_size_mb": 0.4752826690673828
       },
       "optimal_threshold": 0.4551242449372687
     },
@@ -2114,7 +2114,7 @@
         "pr_auc": 0.9484341790229286,
         "brier_score": 0.07433403399851922,
         "optimal_threshold": 0.49634835120197135,
-        "training_time_sec": 0.4398507919977419,
+        "training_time_sec": 0.42234204200212844,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2144,8 +2144,8 @@
             "support": 191.0
           }
         },
-        "inference_time_ms": 0.046099999599391595,
-        "model_size_mb": 0.4730081558227539
+        "inference_time_ms": 0.04274170059943572,
+        "model_size_mb": 0.4730072021484375
       },
       "optimal_threshold": 0.49634835120197135
     },
@@ -2169,7 +2169,7 @@
         "pr_auc": 0.997913368245849,
         "brier_score": 0.01886198879739436,
         "optimal_threshold": 0.7974306193416888,
-        "training_time_sec": 0.44476845800090814,
+        "training_time_sec": 0.4421238340000855,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2199,8 +2199,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.043954099965048954,
-        "model_size_mb": 0.4803619384765625
+        "inference_time_ms": 0.04308339994167909,
+        "model_size_mb": 0.4803609848022461
       },
       "optimal_threshold": 0.7974306193416888
     },
@@ -2224,7 +2224,7 @@
         "pr_auc": 0.9967462738541244,
         "brier_score": 0.02042338694044831,
         "optimal_threshold": 0.29547822874025487,
-        "training_time_sec": 0.4390248750059982,
+        "training_time_sec": 0.4392566659953445,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2254,8 +2254,8 @@
             "support": 185.0
           }
         },
-        "inference_time_ms": 0.0461292002000846,
-        "model_size_mb": 0.47716522216796875
+        "inference_time_ms": 0.04382500046631321,
+        "model_size_mb": 0.47716426849365234
       },
       "optimal_threshold": 0.29547822874025487
     },
@@ -2279,7 +2279,7 @@
         "pr_auc": 0.7908000985236029,
         "brier_score": 0.36351344421997117,
         "optimal_threshold": 0.2168587111602217,
-        "training_time_sec": 0.43173429199669044,
+        "training_time_sec": 0.4239841249946039,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2309,8 +2309,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.04383330015116371,
-        "model_size_mb": 0.4629640579223633
+        "inference_time_ms": 0.042424999992363155,
+        "model_size_mb": 0.4629631042480469
       },
       "optimal_threshold": 0.2168587111602217
     },
@@ -2334,7 +2334,7 @@
         "pr_auc": 0.9546955755944886,
         "brier_score": 0.07612846488666439,
         "optimal_threshold": 0.7594295505346094,
-        "training_time_sec": 0.4426748339974438,
+        "training_time_sec": 0.4200457500119228,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2364,8 +2364,8 @@
             "support": 187.0
           }
         },
-        "inference_time_ms": 0.04319159997976385,
-        "model_size_mb": 0.4789752960205078
+        "inference_time_ms": 0.054887500300537795,
+        "model_size_mb": 0.4789743423461914
       },
       "optimal_threshold": 0.7594295505346094
     },
@@ -2389,7 +2389,7 @@
         "pr_auc": 0.9999999999999998,
         "brier_score": 4.985673951005396e-08,
         "optimal_threshold": 0.5655426221633252,
-        "training_time_sec": 0.44043008299922803,
+        "training_time_sec": 0.42578525000135414,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2419,8 +2419,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.043804199958685786,
-        "model_size_mb": 0.4816865921020508
+        "inference_time_ms": 0.04480839997995645,
+        "model_size_mb": 0.4816856384277344
       },
       "optimal_threshold": 0.5655426221633252
     },
@@ -2444,7 +2444,7 @@
         "pr_auc": 0.9234850644601456,
         "brier_score": 0.15036506480704132,
         "optimal_threshold": 0.7298341085313841,
-        "training_time_sec": 0.44060583299869904,
+        "training_time_sec": 0.4261653749999823,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2474,8 +2474,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.04347909998614341,
-        "model_size_mb": 0.47164058685302734
+        "inference_time_ms": 0.04814999992959201,
+        "model_size_mb": 0.47163963317871094
       },
       "optimal_threshold": 0.7298341085313841
     }
@@ -2501,7 +2501,7 @@
         "pr_auc": 0.9884203053360896,
         "brier_score": 0.028812628380462085,
         "optimal_threshold": 0.5461487770080566,
-        "training_time_sec": 0.11992370799998753,
+        "training_time_sec": 0.12373249999654945,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2531,7 +2531,7 @@
             "support": 177.0
           }
         },
-        "inference_time_ms": 0.020208299974910915,
+        "inference_time_ms": 0.020804200903512537,
         "model_size_mb": 0.18051624298095703
       },
       "optimal_threshold": 0.5461487770080566
@@ -2556,7 +2556,7 @@
         "pr_auc": 0.9877678696567571,
         "brier_score": 0.07236954623750991,
         "optimal_threshold": 0.6987825632095337,
-        "training_time_sec": 0.11578512499545468,
+        "training_time_sec": 0.11750483400828671,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2586,7 +2586,7 @@
             "support": 178.0
           }
         },
-        "inference_time_ms": 0.020429199503269047,
+        "inference_time_ms": 0.02679169992916286,
         "model_size_mb": 0.17772579193115234
       },
       "optimal_threshold": 0.6987825632095337
@@ -2611,7 +2611,7 @@
         "pr_auc": 1.0,
         "brier_score": 2.7199238702303963e-07,
         "optimal_threshold": 0.439065545797348,
-        "training_time_sec": 0.12384870800451608,
+        "training_time_sec": 0.11830370800453238,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2641,7 +2641,7 @@
             "support": 180.0
           }
         },
-        "inference_time_ms": 0.01936250046128407,
+        "inference_time_ms": 0.020237499848008156,
         "model_size_mb": 0.1811676025390625
       },
       "optimal_threshold": 0.439065545797348
@@ -2666,7 +2666,7 @@
         "pr_auc": 0.9999999999999998,
         "brier_score": 0.006963902854992192,
         "optimal_threshold": 0.7267870903015137,
-        "training_time_sec": 0.12257412500184728,
+        "training_time_sec": 0.11752791599428747,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2696,7 +2696,7 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.019800000154646114,
+        "inference_time_ms": 0.018804200226441026,
         "model_size_mb": 0.17999744415283203
       },
       "optimal_threshold": 0.7267870903015137
@@ -2721,7 +2721,7 @@
         "pr_auc": 0.985764698137269,
         "brier_score": 0.03150701182032059,
         "optimal_threshold": 0.3716017007827759,
-        "training_time_sec": 0.11767624999629334,
+        "training_time_sec": 0.11446650000289083,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2751,7 +2751,7 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.01903749944176525,
+        "inference_time_ms": 0.022479199105873704,
         "model_size_mb": 0.1783132553100586
       },
       "optimal_threshold": 0.3716017007827759
@@ -2776,7 +2776,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.1355987043549977,
         "optimal_threshold": 0.6164265871047974,
-        "training_time_sec": 0.11575929199898383,
+        "training_time_sec": 0.11160716699669138,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2806,7 +2806,7 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.022616599744651467,
+        "inference_time_ms": 0.019324998720549047,
         "model_size_mb": 0.17792034149169922
       },
       "optimal_threshold": 0.6164265871047974
@@ -2831,7 +2831,7 @@
         "pr_auc": 1.0000000000000002,
         "brier_score": 0.02416802319965954,
         "optimal_threshold": 0.5386402606964111,
-        "training_time_sec": 0.12591062499996042,
+        "training_time_sec": 0.12173787500069011,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2861,7 +2861,7 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.023075000353856012,
+        "inference_time_ms": 0.018524999904911965,
         "model_size_mb": 0.1809711456298828
       },
       "optimal_threshold": 0.5386402606964111
@@ -2886,7 +2886,7 @@
         "pr_auc": 0.9999999999999996,
         "brier_score": 0.1762455297270065,
         "optimal_threshold": 0.6003757119178772,
-        "training_time_sec": 0.11628454099991359,
+        "training_time_sec": 0.11360620900813956,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2916,7 +2916,7 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.022566700499737635,
+        "inference_time_ms": 0.02271670091431588,
         "model_size_mb": 0.17597675323486328
       },
       "optimal_threshold": 0.6003757119178772
@@ -2941,7 +2941,7 @@
         "pr_auc": 0.9481380968715725,
         "brier_score": 0.06893007224807819,
         "optimal_threshold": 0.5895609259605408,
-        "training_time_sec": 0.11890308299916796,
+        "training_time_sec": 0.11677929099823814,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -2971,7 +2971,7 @@
             "support": 191.0
           }
         },
-        "inference_time_ms": 0.022200000239536166,
+        "inference_time_ms": 0.019195899949409068,
         "model_size_mb": 0.1770763397216797
       },
       "optimal_threshold": 0.5895609259605408
@@ -2996,7 +2996,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.005713083191923038,
         "optimal_threshold": 0.6543527841567993,
-        "training_time_sec": 0.11859833299968159,
+        "training_time_sec": 0.12156545800098684,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3026,7 +3026,7 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.01997500003199093,
+        "inference_time_ms": 0.020483299158513546,
         "model_size_mb": 0.17850780487060547
       },
       "optimal_threshold": 0.6543527841567993
@@ -3051,7 +3051,7 @@
         "pr_auc": 0.994651655730064,
         "brier_score": 0.028873715090151967,
         "optimal_threshold": 0.5859034061431885,
-        "training_time_sec": 0.1203666669971426,
+        "training_time_sec": 0.1192184579995228,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3081,7 +3081,7 @@
             "support": 185.0
           }
         },
-        "inference_time_ms": 0.024766700516920537,
+        "inference_time_ms": 0.020199999562464654,
         "model_size_mb": 0.1801919937133789
       },
       "optimal_threshold": 0.5859034061431885
@@ -3106,7 +3106,7 @@
         "pr_auc": 0.7080681752809612,
         "brier_score": 0.28109979651386047,
         "optimal_threshold": 0.7009698152542114,
-        "training_time_sec": 0.11243291700520786,
+        "training_time_sec": 0.11017879100108985,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3136,7 +3136,7 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.019933300063712522,
+        "inference_time_ms": 0.026887499552685767,
         "model_size_mb": 0.1729259490966797
       },
       "optimal_threshold": 0.7009698152542114
@@ -3161,7 +3161,7 @@
         "pr_auc": 0.9263112918417172,
         "brier_score": 0.08891584466566377,
         "optimal_threshold": 0.5198941230773926,
-        "training_time_sec": 0.11641366699768696,
+        "training_time_sec": 0.1192396669939626,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3191,7 +3191,7 @@
             "support": 187.0
           }
         },
-        "inference_time_ms": 0.020258399308659136,
+        "inference_time_ms": 0.02021249965764582,
         "model_size_mb": 0.1768798828125
       },
       "optimal_threshold": 0.5198941230773926
@@ -3216,7 +3216,7 @@
         "pr_auc": 1.0,
         "brier_score": 8.66294897405228e-06,
         "optimal_threshold": 0.605377197265625,
-        "training_time_sec": 0.1223654589994112,
+        "training_time_sec": 0.12242737499764189,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3246,7 +3246,7 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.020591600332409143,
+        "inference_time_ms": 0.020620800205506384,
         "model_size_mb": 0.18155574798583984
       },
       "optimal_threshold": 0.605377197265625
@@ -3271,7 +3271,7 @@
         "pr_auc": 0.9172236337568763,
         "brier_score": 0.13239534359908967,
         "optimal_threshold": 0.732571542263031,
-        "training_time_sec": 0.11602425000455696,
+        "training_time_sec": 0.10989179200259969,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3301,7 +3301,7 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.022266699670581147,
+        "inference_time_ms": 0.019225000869482756,
         "model_size_mb": 0.17461395263671875
       },
       "optimal_threshold": 0.732571542263031
@@ -3326,9 +3326,9 @@
         "fn": 16,
         "roc_auc": 0.9608695652173913,
         "pr_auc": 0.8802504023472653,
-        "brier_score": 0.057541958694341463,
-        "optimal_threshold": 0.6945309502956782,
-        "training_time_sec": 0.00909658399905311,
+        "brier_score": 0.05754195869434146,
+        "optimal_threshold": 0.6945309502956785,
+        "training_time_sec": 0.013479333007126115,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3358,10 +3358,10 @@
             "support": 177.0
           }
         },
-        "inference_time_ms": 0.00420420037698932,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.0076374999480322,
+        "model_size_mb": 0.0009250640869140625
       },
-      "optimal_threshold": 0.6945309502956782
+      "optimal_threshold": 0.6945309502956785
     },
     {
       "fold_id": 1,
@@ -3383,7 +3383,7 @@
         "pr_auc": 0.9997596153846153,
         "brier_score": 0.011832660767978101,
         "optimal_threshold": 0.6180698042587773,
-        "training_time_sec": 0.008766791004745755,
+        "training_time_sec": 0.00906583400501404,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3413,8 +3413,8 @@
             "support": 178.0
           }
         },
-        "inference_time_ms": 0.003912499960279092,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004379200981929898,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.6180698042587773
     },
@@ -3436,9 +3436,9 @@
         "fn": 2,
         "roc_auc": 1.0,
         "pr_auc": 1.0,
-        "brier_score": 0.004799545641439949,
+        "brier_score": 0.00479954564143995,
         "optimal_threshold": 0.6402339635889495,
-        "training_time_sec": 0.008084875000349712,
+        "training_time_sec": 0.01927933299157303,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3468,8 +3468,8 @@
             "support": 180.0
           }
         },
-        "inference_time_ms": 0.0038207996112760156,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004212500061839819,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.6402339635889495
     },
@@ -3493,7 +3493,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.0065495613520463215,
         "optimal_threshold": 0.6475999108430892,
-        "training_time_sec": 0.00842512500094017,
+        "training_time_sec": 0.008481208002194762,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3523,8 +3523,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.0038624995795544237,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004129200533498079,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.6475999108430892
     },
@@ -3546,9 +3546,9 @@
         "fn": 10,
         "roc_auc": 0.9904823989569752,
         "pr_auc": 0.9845816541389667,
-        "brier_score": 0.04277525829957308,
+        "brier_score": 0.04277525829957306,
         "optimal_threshold": 0.5961985396128117,
-        "training_time_sec": 0.00764550000167219,
+        "training_time_sec": 0.011627416999544948,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3578,8 +3578,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.0038666999898850918,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004174999776296318,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.5961985396128117
     },
@@ -3602,8 +3602,8 @@
         "roc_auc": 1.0,
         "pr_auc": 1.0,
         "brier_score": 0.2130712455956746,
-        "optimal_threshold": 0.6810054659850568,
-        "training_time_sec": 0.008045957998547237,
+        "optimal_threshold": 0.6810054659850567,
+        "training_time_sec": 0.021600957988994196,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3633,10 +3633,10 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.0039083002775441855,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004062500374857336,
+        "model_size_mb": 0.0009250640869140625
       },
-      "optimal_threshold": 0.6810054659850568
+      "optimal_threshold": 0.6810054659850567
     },
     {
       "fold_id": 6,
@@ -3658,7 +3658,7 @@
         "pr_auc": 0.9759624977711621,
         "brier_score": 0.04190791659800293,
         "optimal_threshold": 0.4674995703599395,
-        "training_time_sec": 0.008019917004276067,
+        "training_time_sec": 0.008769750013016164,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3688,8 +3688,8 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.0036332996387500316,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.010537500202190131,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.4674995703599395
     },
@@ -3713,7 +3713,7 @@
         "pr_auc": 0.9924239588646158,
         "brier_score": 0.27935076142366533,
         "optimal_threshold": 0.5204478846661802,
-        "training_time_sec": 0.00743454199982807,
+        "training_time_sec": 0.020661832997575402,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3743,8 +3743,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.003837500116787851,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004350001108832657,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.5204478846661802
     },
@@ -3767,8 +3767,8 @@
         "roc_auc": 0.9717901091246808,
         "pr_auc": 0.9379128462179185,
         "brier_score": 0.08058707877964383,
-        "optimal_threshold": 0.48726684848538226,
-        "training_time_sec": 0.008004374998563435,
+        "optimal_threshold": 0.4872668484853824,
+        "training_time_sec": 0.008398791993386112,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3798,10 +3798,10 @@
             "support": 191.0
           }
         },
-        "inference_time_ms": 0.0036749996070284396,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004170800093561411,
+        "model_size_mb": 0.0009250640869140625
       },
-      "optimal_threshold": 0.48726684848538226
+      "optimal_threshold": 0.4872668484853824
     },
     {
       "fold_id": 9,
@@ -3822,8 +3822,8 @@
         "roc_auc": 1.0,
         "pr_auc": 1.0,
         "brier_score": 0.007640763198154131,
-        "optimal_threshold": 0.45744673811219105,
-        "training_time_sec": 0.008537749999959487,
+        "optimal_threshold": 0.4574467381121912,
+        "training_time_sec": 0.014032457998837344,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3853,10 +3853,10 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.0035999997635371983,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004274999082554132,
+        "model_size_mb": 0.0009250640869140625
       },
-      "optimal_threshold": 0.45744673811219105
+      "optimal_threshold": 0.4574467381121912
     },
     {
       "fold_id": 10,
@@ -3878,7 +3878,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.06532874231504626,
         "optimal_threshold": 0.6566379805789679,
-        "training_time_sec": 0.00821170899871504,
+        "training_time_sec": 0.018206624998128973,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3908,8 +3908,8 @@
             "support": 185.0
           }
         },
-        "inference_time_ms": 0.003587499668356031,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004379200981929898,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.6566379805789679
     },
@@ -3931,9 +3931,9 @@
         "fn": 2,
         "roc_auc": 0.9577517447657029,
         "pr_auc": 0.9373437692566472,
-        "brier_score": 0.206499294368581,
+        "brier_score": 0.20649929436858097,
         "optimal_threshold": 0.5998252490948546,
-        "training_time_sec": 0.007902541001385543,
+        "training_time_sec": 0.008375499994144775,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -3963,8 +3963,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.003650000144261867,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.004304198955651373,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.5998252490948546
     },
@@ -3988,7 +3988,7 @@
         "pr_auc": 0.8488995283678913,
         "brier_score": 0.3660512835767269,
         "optimal_threshold": 0.5114415444701919,
-        "training_time_sec": 0.007447999996657018,
+        "training_time_sec": 0.010252665990265086,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4018,8 +4018,8 @@
             "support": 187.0
           }
         },
-        "inference_time_ms": 0.0037083998904563487,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.0042333005694672465,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.5114415444701919
     },
@@ -4043,7 +4043,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.002179839808048831,
         "optimal_threshold": 0.5188037165494325,
-        "training_time_sec": 0.008291250000183936,
+        "training_time_sec": 0.008585167001001537,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4073,8 +4073,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.0036666999221779406,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.003962499613407999,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.5188037165494325
     },
@@ -4098,7 +4098,7 @@
         "pr_auc": 0.7702110801306902,
         "brier_score": 0.1428028050773472,
         "optimal_threshold": 0.5358072574136008,
-        "training_time_sec": 0.007613875000970438,
+        "training_time_sec": 0.01481749999220483,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4128,8 +4128,8 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.004050000279676169,
-        "model_size_mb": 0.0009260177612304688
+        "inference_time_ms": 0.003962499613407999,
+        "model_size_mb": 0.0009250640869140625
       },
       "optimal_threshold": 0.5358072574136008
     }
@@ -4153,9 +4153,9 @@
         "fn": 0,
         "roc_auc": 0.9744740532959326,
         "pr_auc": 0.9313689534576013,
-        "brier_score": 0.03621132028770477,
-        "optimal_threshold": 0.4320887680368325,
-        "training_time_sec": 0.17391529100132175,
+        "brier_score": 0.03621132028770476,
+        "optimal_threshold": 0.4320887680368323,
+        "training_time_sec": 0.4550877500005299,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4185,10 +4185,10 @@
             "support": 177.0
           }
         },
-        "inference_time_ms": 0.005812499875901267,
-        "model_size_mb": 0.10227775573730469
+        "inference_time_ms": 0.017020800441969186,
+        "model_size_mb": 0.09980392456054688
       },
-      "optimal_threshold": 0.4320887680368325
+      "optimal_threshold": 0.4320887680368323
     },
     {
       "fold_id": 1,
@@ -4209,8 +4209,8 @@
         "roc_auc": 0.9991776315789473,
         "pr_auc": 0.998498878549917,
         "brier_score": 0.02064048403563376,
-        "optimal_threshold": 0.28730359314301174,
-        "training_time_sec": 0.202834083000198,
+        "optimal_threshold": 0.2873035931430116,
+        "training_time_sec": 0.7437073750043055,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4240,10 +4240,10 @@
             "support": 178.0
           }
         },
-        "inference_time_ms": 0.006062499596737325,
-        "model_size_mb": 0.10254478454589844
+        "inference_time_ms": 0.006033299723640084,
+        "model_size_mb": 0.10007095336914062
       },
-      "optimal_threshold": 0.28730359314301174
+      "optimal_threshold": 0.2873035931430116
     },
     {
       "fold_id": 2,
@@ -4263,9 +4263,9 @@
         "fn": 0,
         "roc_auc": 1.0,
         "pr_auc": 1.0,
-        "brier_score": 0.0002772934955006946,
-        "optimal_threshold": 0.30036499102311537,
-        "training_time_sec": 0.18230758300342131,
+        "brier_score": 0.00027729349550069545,
+        "optimal_threshold": 0.3003649910231151,
+        "training_time_sec": 0.6471132919978118,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4295,10 +4295,10 @@
             "support": 180.0
           }
         },
-        "inference_time_ms": 0.005645799683406949,
-        "model_size_mb": 0.10238456726074219
+        "inference_time_ms": 0.006370800838340074,
+        "model_size_mb": 0.09991073608398438
       },
-      "optimal_threshold": 0.30036499102311537
+      "optimal_threshold": 0.3003649910231151
     },
     {
       "fold_id": 3,
@@ -4318,9 +4318,9 @@
         "fn": 0,
         "roc_auc": 0.9997414350355527,
         "pr_auc": 0.9995302133763672,
-        "brier_score": 0.0071427570313931,
-        "optimal_threshold": 0.47507347760602125,
-        "training_time_sec": 0.2134239160004654,
+        "brier_score": 0.007142757031393104,
+        "optimal_threshold": 0.47507347760602114,
+        "training_time_sec": 0.6060647500125924,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4350,10 +4350,10 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.005633399996440858,
-        "model_size_mb": 0.10265159606933594
+        "inference_time_ms": 0.01576249924255535,
+        "model_size_mb": 0.10017776489257812
       },
-      "optimal_threshold": 0.47507347760602125
+      "optimal_threshold": 0.47507347760602114
     },
     {
       "fold_id": 4,
@@ -4375,7 +4375,7 @@
         "pr_auc": 0.9360400134082638,
         "brier_score": 0.08378443801937838,
         "optimal_threshold": 0.37034153355266686,
-        "training_time_sec": 0.20337645900144707,
+        "training_time_sec": 0.7976162499981001,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4405,8 +4405,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.005716600571759045,
-        "model_size_mb": 0.10257148742675781
+        "inference_time_ms": 0.0065167012508027256,
+        "model_size_mb": 0.10009765625
       },
       "optimal_threshold": 0.37034153355266686
     },
@@ -4430,7 +4430,7 @@
         "pr_auc": 1.0,
         "brier_score": 0.3469193608973916,
         "optimal_threshold": 0.4483934110461428,
-        "training_time_sec": 0.17864304200338665,
+        "training_time_sec": 0.4372137919999659,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4460,8 +4460,8 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.005650000093737617,
-        "model_size_mb": 0.10233116149902344
+        "inference_time_ms": 0.006408299668692052,
+        "model_size_mb": 0.09985733032226562
       },
       "optimal_threshold": 0.4483934110461428
     },
@@ -4483,9 +4483,9 @@
         "fn": 16,
         "roc_auc": 0.9889016456180635,
         "pr_auc": 0.9775141347587515,
-        "brier_score": 0.07197268889976041,
-        "optimal_threshold": 0.42610558197470605,
-        "training_time_sec": 0.222966458000883,
+        "brier_score": 0.07197268889976038,
+        "optimal_threshold": 0.4261055819747059,
+        "training_time_sec": 0.5609185420034919,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4515,10 +4515,10 @@
             "support": 184.0
           }
         },
-        "inference_time_ms": 0.005666699871653691,
-        "model_size_mb": 0.10272979736328125
+        "inference_time_ms": 0.006220900104381144,
+        "model_size_mb": 0.10025691986083984
       },
-      "optimal_threshold": 0.42610558197470605
+      "optimal_threshold": 0.4261055819747059
     },
     {
       "fold_id": 7,
@@ -4539,8 +4539,8 @@
         "roc_auc": 0.9971316818774445,
         "pr_auc": 0.9946633127086575,
         "brier_score": 0.2579905204528932,
-        "optimal_threshold": 0.6029266319783747,
-        "training_time_sec": 0.18090970800403738,
+        "optimal_threshold": 0.6029266319783746,
+        "training_time_sec": 0.6088887909863843,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4570,10 +4570,10 @@
             "support": 183.0
           }
         },
-        "inference_time_ms": 0.006004099850542843,
-        "model_size_mb": 0.10235595703125
+        "inference_time_ms": 0.00646250118734315,
+        "model_size_mb": 0.0998830795288086
       },
-      "optimal_threshold": 0.6029266319783747
+      "optimal_threshold": 0.6029266319783746
     },
     {
       "fold_id": 8,
@@ -4593,9 +4593,9 @@
         "fn": 2,
         "roc_auc": 0.9634316229394009,
         "pr_auc": 0.9357928352356203,
-        "brier_score": 0.07472528382922655,
-        "optimal_threshold": 0.37974135492199446,
-        "training_time_sec": 0.1418326659986633,
+        "brier_score": 0.07472528382922654,
+        "optimal_threshold": 0.3797413549219947,
+        "training_time_sec": 0.5402454579889309,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4625,10 +4625,10 @@
             "support": 191.0
           }
         },
-        "inference_time_ms": 0.005691699334420264,
-        "model_size_mb": 0.10201072692871094
+        "inference_time_ms": 0.006112499977461994,
+        "model_size_mb": 0.09953689575195312
       },
-      "optimal_threshold": 0.37974135492199446
+      "optimal_threshold": 0.3797413549219947
     },
     {
       "fold_id": 9,
@@ -4648,9 +4648,9 @@
         "fn": 0,
         "roc_auc": 1.0,
         "pr_auc": 1.0,
-        "brier_score": 1.6999577446498354e-05,
-        "optimal_threshold": 0.4831048918469015,
-        "training_time_sec": 0.16792137500306126,
+        "brier_score": 1.6999577446498378e-05,
+        "optimal_threshold": 0.48310489184690136,
+        "training_time_sec": 0.6753807909990428,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4680,10 +4680,10 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.006983300409046933,
-        "model_size_mb": 0.1022491455078125
+        "inference_time_ms": 0.006120800389908254,
+        "model_size_mb": 0.0997762680053711
       },
-      "optimal_threshold": 0.4831048918469015
+      "optimal_threshold": 0.48310489184690136
     },
     {
       "fold_id": 10,
@@ -4703,9 +4703,9 @@
         "fn": 0,
         "roc_auc": 1.0,
         "pr_auc": 1.0,
-        "brier_score": 0.00031163829864542326,
+        "brier_score": 0.0003116382986454239,
         "optimal_threshold": 0.47440948183883663,
-        "training_time_sec": 0.2172324170023785,
+        "training_time_sec": 0.822685791994445,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4735,8 +4735,8 @@
             "support": 185.0
           }
         },
-        "inference_time_ms": 0.005537499964702874,
-        "model_size_mb": 0.10262489318847656
+        "inference_time_ms": 0.0061332990298978984,
+        "model_size_mb": 0.10015106201171875
       },
       "optimal_threshold": 0.47440948183883663
     },
@@ -4758,9 +4758,9 @@
         "fn": 4,
         "roc_auc": 0.9562562313060818,
         "pr_auc": 0.935891555376157,
-        "brier_score": 0.12083688745653423,
-        "optimal_threshold": 0.5014981899534302,
-        "training_time_sec": 0.287455833000422,
+        "brier_score": 0.12083688745653426,
+        "optimal_threshold": 0.5014981899534301,
+        "training_time_sec": 0.9746066670049913,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4790,10 +4790,10 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.0057292003475595266,
-        "model_size_mb": 0.10329246520996094
+        "inference_time_ms": 0.0062709004851058125,
+        "model_size_mb": 0.10081863403320312
       },
-      "optimal_threshold": 0.5014981899534302
+      "optimal_threshold": 0.5014981899534301
     },
     {
       "fold_id": 12,
@@ -4813,9 +4813,9 @@
         "fn": 13,
         "roc_auc": 0.8558093834438713,
         "pr_auc": 0.8498784313495116,
-        "brier_score": 0.20145566798063622,
-        "optimal_threshold": 0.34301442636957125,
-        "training_time_sec": 0.1528524590030429,
+        "brier_score": 0.20145566798063627,
+        "optimal_threshold": 0.34301442636957113,
+        "training_time_sec": 0.5669348329975037,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4845,10 +4845,10 @@
             "support": 187.0
           }
         },
-        "inference_time_ms": 0.005641700408887118,
-        "model_size_mb": 0.10211563110351562
+        "inference_time_ms": 0.006245799886528403,
+        "model_size_mb": 0.09964275360107422
       },
-      "optimal_threshold": 0.34301442636957125
+      "optimal_threshold": 0.34301442636957113
     },
     {
       "fold_id": 13,
@@ -4868,9 +4868,9 @@
         "fn": 0,
         "roc_auc": 1.0,
         "pr_auc": 1.0,
-        "brier_score": 0.0006582835607356536,
-        "optimal_threshold": 0.4538217690514002,
-        "training_time_sec": 0.15939125000295462,
+        "brier_score": 0.0006582835607356531,
+        "optimal_threshold": 0.4538217690514003,
+        "training_time_sec": 0.5632320830045501,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4900,10 +4900,10 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.005612499808194116,
-        "model_size_mb": 0.10216903686523438
+        "inference_time_ms": 0.006304201087914407,
+        "model_size_mb": 0.09969615936279297
       },
-      "optimal_threshold": 0.4538217690514002
+      "optimal_threshold": 0.4538217690514003
     },
     {
       "fold_id": 14,
@@ -4924,8 +4924,8 @@
         "roc_auc": 0.9638157894736842,
         "pr_auc": 0.9560503214544741,
         "brier_score": 0.09154386504560269,
-        "optimal_threshold": 0.5901888193284733,
-        "training_time_sec": 0.16887320800015004,
+        "optimal_threshold": 0.5901888193284734,
+        "training_time_sec": 0.5623737499990966,
         "calibrated": false,
         "fold_degenerate": false,
         "class_report": {
@@ -4955,10 +4955,10 @@
             "support": 186.0
           }
         },
-        "inference_time_ms": 0.005495799996424466,
-        "model_size_mb": 0.1022491455078125
+        "inference_time_ms": 0.006787499296478927,
+        "model_size_mb": 0.0997762680053711
       },
-      "optimal_threshold": 0.5901888193284733
+      "optimal_threshold": 0.5901888193284734
     }
   ]
 }
