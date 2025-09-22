@@ -97,7 +97,7 @@ class CoreDataReset {
         let keys = defaults.dictionaryRepresentation().keys
         
         for key in keys {
-            if key.hasPrefix("Shadow_") {
+            if key.hasPrefix("Shadow_") || key == "ShadowDefaultDeviceUUID" {
                 defaults.removeObject(forKey: key)
                 print("✅ Cleared UserDefaults key: \(key)")
             }
