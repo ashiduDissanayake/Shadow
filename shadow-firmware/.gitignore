@@ -1,3 +1,5 @@
 build/
 sdkconfig
 sdkconfig.old
+.venv_tflite
+managed_components/

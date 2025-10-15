@@ -40,9 +40,11 @@
 
 // Include Shadow project headers
 #include "realtime_sensor_buffer.h"
-#include "feature_extractor.h"
-#include "simple_mlp.h"
-#include "stress_fsm.h"
+#include "signal_preprocessor.h"    // Signal preprocessing for CNN
+#include "cnn_inference.h"          // CNN inference engine (replaces MLP+FSM)
+#include "feature_extractor.h"      // OLD: Keep for now, will remove later
+#include "simple_mlp.h"             // OLD: Keep for now, will remove later
+#include "stress_fsm.h"             // OLD: Keep for now, will remove later
 #include "event_log.h"
 #include "ble_stress_service.h"
 
@@ -60,8 +62,9 @@
 #define MPU6050_ADDR        0x68
 
 // ==================== SAMPLING RATES ====================
-#define BVP_TARGET_HZ       64
-#define ACC_TARGET_HZ       32
+// NOTE: All sensors configured to 4Hz for CNN model (no resampling needed)
+#define BVP_TARGET_HZ       4
+#define ACC_TARGET_HZ       4
 #define EDA_TARGET_HZ       4
 #define TEMP_TARGET_HZ      4
 
@@ -1032,66 +1035,76 @@ static esp_err_t setup_gpio_interrupts(void) {
 /* ================= CONSUMER TASK - ML INFERENCE PIPELINE ================= */
 void consumer_task(void *param) {
     ESP_LOGI(TAG, "🧠 Consumer started (Core %d)", xPortGetCoreID());
+    ESP_LOGI(TAG, "🎯 Real sensor integration: MAX30105 + MPU6050 + GSR + TEMP(mock)");
+    ESP_LOGI(TAG, "🧠 CNN Pipeline: Signal preprocessing → CNN inference → BLE");
     vTaskDelay(pdMS_TO_TICKS(3000)); /* warm-up delay */
+
+    // Allocate buffers for CNN input
+    cnn_input_tensor_t cnn_input;
+    cnn_inference_result_t cnn_result;
 
     while (1) {
         // Wait for ML-ready signal from realtime sensor system
         if (xSemaphoreTake(g_sensor_system.ml_ready_sem, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI(TAG, "🔔 ML Inference #%lu", total_inferences);
+            total_inferences++;
+            ESP_LOGI(TAG, "🔔 CNN Inference #%lu", total_inferences);
             uint32_t t_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
             // Get minimum synchronized batch count across all sensors
             uint32_t min_batches = realtime_get_min_batch_count();
             ESP_LOGI(TAG, "🎯 Min synchronized batches: %lu sec", min_batches);
 
-            // Extract features from synchronized sensor windows
-            feature_vector_t features;
-            int fr = extract_features_realtime(&g_sensor_system,
-                                               &g_feature_workspace,
-                                               &features);
-            if (fr != 0) {
-                ESP_LOGE(TAG, "❌ Feature extraction failed (%d)", fr);
+            /* ==================== NEW CNN PIPELINE ==================== */
+            
+            // Step 1: Preprocess sensor data for CNN input
+            uint32_t preprocess_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
+            int preprocess_ret = preprocess_for_cnn(&g_sensor_system, &cnn_input);
+            uint32_t preprocess_time = (xTaskGetTickCount() * portTICK_PERIOD_MS) - preprocess_start;
+            
+            if (preprocess_ret != 0) {
+                ESP_LOGE(TAG, "❌ Preprocessing failed (%d)", preprocess_ret);
+                realtime_mark_batch_processed(min_batches);
                 continue;
             }
-            ESP_LOGI(TAG, "✅ Features extracted in %lu ms", features.extraction_time_ms);
+            ESP_LOGI(TAG, "✅ Preprocessing complete in %lu ms", preprocess_time);
 
-            // Run ML inference
-            uint32_t ml_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
-            float prob = shadow_mlp_predict_probability(features.features);
-            int   cls  = shadow_mlp_predict_class(features.features);
-            uint32_t ml_time = (xTaskGetTickCount() * portTICK_PERIOD_MS) - ml_start;
+            // Step 2: Run CNN inference
+            uint32_t cnn_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
+            int cnn_ret = cnn_inference_predict(&cnn_input, &cnn_result);
+            uint32_t cnn_time = (xTaskGetTickCount() * portTICK_PERIOD_MS) - cnn_start;
 
-            // Mark batch as processed in sensor system
+            // Mark batch as processed
             realtime_mark_batch_processed(min_batches);
+
+            if (cnn_ret != 0 || !cnn_result.success) {
+                ESP_LOGE(TAG, "❌ CNN inference failed (ret=%d, success=%d)", cnn_ret, cnn_result.success);
+                continue;
+            }
 
             uint32_t total_time = (xTaskGetTickCount() * portTICK_PERIOD_MS) - t_start;
 
-            // Process inference through stress FSM
+            // Step 3: Process results and update BLE
+            float stress_prob = cnn_result.stress_probability;
+            const char *stress_class = (stress_prob >= 0.5f) ? "STRESS" : "NORMAL";
+            
+            ESP_LOGI(TAG, "🎯 CNN Inference Result:");
+            ESP_LOGI(TAG, "   Stress Probability: %.1f%%", stress_prob * 100.0f);
+            ESP_LOGI(TAG, "   Class: %s (threshold: 0.5)", stress_class);
+            ESP_LOGI(TAG, "   Preprocessing: %lu ms", preprocess_time);
+            ESP_LOGI(TAG, "   CNN Inference: %lu ms (internal: %lu us)",
+                     cnn_time, cnn_result.inference_time_us);
+            ESP_LOGI(TAG, "   Total Pipeline: %lu ms", total_time);
+            ESP_LOGI(TAG, "   Batch Index: %lu", min_batches);
+
+            // Update FSM with CNN probability (for backward compatibility with BLE service)
             uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
-            bool transition = stress_fsm_process_inference(&g_stress_fsm,
-                                                           prob,
-                                                           now_ms,
-                                                           on_stress_transition);
-
-            // Log detailed inference results
-            ESP_LOGI(TAG, "🎯 Inference Result:");
-            ESP_LOGI(TAG, "   Probability: %.3f  Class: %s",
-                     prob, cls ? "STRESS" : "NORMAL");
-            ESP_LOGI(TAG, "   FSM State: %s",
-                     stress_fsm_state_to_string(stress_fsm_get_current_state(&g_stress_fsm)));
-            ESP_LOGI(TAG, "   Transition: %s", transition ? "YES" : "NO");
-            ESP_LOGI(TAG, "   Feature Time: %lu ms", features.extraction_time_ms);
-            ESP_LOGI(TAG, "   ML Time: %lu ms", ml_time);
-            ESP_LOGI(TAG, "   Total Time: %lu ms", total_time);
-            ESP_LOGI(TAG, "   Batch Index Processed: %lu", min_batches);
-
-            total_inferences++;
-
-            // Update BLE advertisement if transition occurred
+            bool transition = stress_fsm_process_inference(&g_stress_fsm, stress_prob, now_ms, on_stress_transition);
+            
+            // Update BLE advertisement
+            ble_stress_service_tick();
+            
             if (transition) {
-                /* on_stress_transition already called ble_stress_service_tick() */
-                /* Optional: additional tick (harmless) */
-                ble_stress_service_tick();
+                ESP_LOGI(TAG, "🔄 Stress state transition occurred");
             }
 
             ESP_LOGI(TAG, "---");
@@ -1304,6 +1317,24 @@ void app_main(void) {
     ESP_LOGI(TAG, "✅ Shadow ML Pipeline initialized successfully");
     ESP_LOGI(TAG, "Memory usage: %lu bytes", realtime_get_memory_usage());
 
+    /* ================= INITIALIZE CNN INFERENCE ENGINE ================= */
+    ESP_LOGI(TAG, "🧠 Initializing CNN inference engine...");
+    int cnn_ret = cnn_inference_init(NULL);  // Use default configuration
+    if (cnn_ret != 0) {
+        ESP_LOGE(TAG, "❌ CNN initialization failed: %d", cnn_ret);
+        ESP_LOGE(TAG, "System will continue but ML inference will be disabled");
+        // Don't return - allow system to continue without CNN
+    } else {
+        size_t used_bytes, total_bytes;
+        cnn_inference_get_memory_stats(&used_bytes, &total_bytes);
+        ESP_LOGI(TAG, "✅ CNN initialized successfully");
+        ESP_LOGI(TAG, "   Model: stress_model_quant.tflite");
+        ESP_LOGI(TAG, "   Tensor arena: %zu / %zu KB (%.1f%% used)",
+                 used_bytes / 1024, total_bytes / 1024,
+                 (used_bytes * 100.0f) / total_bytes);
+        ESP_LOGI(TAG, "   Free heap after CNN init: %lu bytes", esp_get_free_heap_size());
+    }
+
     /* ================= INITIALIZE HARDWARE ================= */
     
     // Create event queue for sensor coordination
@@ -1395,8 +1426,8 @@ void app_main(void) {
 
     ESP_LOGI(TAG, "🚀 Tasks started: producer(Core0) / consumer(Core1)");
     ESP_LOGI(TAG, "🎯 Real sensor integration: MAX30105 + MPU6050 + GSR + TEMP(mock)");
-    ESP_LOGI(TAG, "🧠 ML Pipeline: Feature extraction → MLP inference → Stress FSM → BLE");
-    ESP_LOGI(TAG, "System ONLINE - Real-time stress detection active!");
+    ESP_LOGI(TAG, "🧠 CNN Pipeline: Signal preprocessing → CNN inference → BLE");
+    ESP_LOGI(TAG, "System ONLINE - Real-time stress detection with CNN active!");
 
     /* ================= MAIN MONITORING LOOP ================= */
     

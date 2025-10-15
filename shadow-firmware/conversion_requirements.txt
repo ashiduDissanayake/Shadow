@@ -1,0 +1,8 @@
+# Requirements for PyTorch to TFLite model conversion
+# Install with: pip install -r conversion_requirements.txt
+
+torch>=2.0.0
+onnx>=1.14.0
+onnx2tf>=1.17.0
+tensorflow>=2.13.0
+numpy>=1.24.0

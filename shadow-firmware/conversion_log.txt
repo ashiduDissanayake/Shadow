@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/Users/ashidudissanayake/Dev/Shadow/shadow-firmware/onnx_to_tflite.py", line 43, in <module>
+    import onnx2tf
+  File "/Users/ashidudissanayake/Dev/Shadow/shadow-firmware/.venv_tflite/lib/python3.11/site-packages/onnx2tf/__init__.py", line 1, in <module>
+    from onnx2tf.onnx2tf import convert, main
+  File "/Users/ashidudissanayake/Dev/Shadow/shadow-firmware/.venv_tflite/lib/python3.11/site-packages/onnx2tf/onnx2tf.py", line 29, in <module>
+    import tf_keras
+ModuleNotFoundError: No module named 'tf_keras'
+================================================================================
+ONNX to TFLite Converter
+================================================================================
+
+Input:  /Users/ashidudissanayake/Dev/Shadow/shadow-firmware/model_output/stress_model.onnx (431.07 KB)
+Output: /Users/ashidudissanayake/Dev/Shadow/shadow-firmware/model_output/stress_model_quant.tflite
+
+================================================================================
+Step 1: Converting ONNX to TensorFlow
+================================================================================
+❌ ERROR during ONNX to TensorFlow conversion: No module named 'tf_keras'

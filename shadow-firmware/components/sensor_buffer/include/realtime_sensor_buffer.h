@@ -27,15 +27,15 @@
 #define STEP_SECONDS              10
 #define NUM_SENSOR_BUFFERS        6
 
-// Sampling rates (Hz)
-#define BVP_SAMPLE_RATE           64
-#define ACC_SAMPLE_RATE           32
+// Sampling rates (Hz) - All sensors at 4Hz for CNN model (no resampling needed)
+#define BVP_SAMPLE_RATE           4
+#define ACC_SAMPLE_RATE           4
 #define EDA_SAMPLE_RATE           4
 #define TEMP_SAMPLE_RATE          4
 
 // Buffer sizes (exactly one full 60 s window per sensor)
-#define BVP_BUFFER_SIZE           (BVP_SAMPLE_RATE * WINDOW_SECONDS)    // 3840
-#define ACC_BUFFER_SIZE           (ACC_SAMPLE_RATE * WINDOW_SECONDS)    // 1920
+#define BVP_BUFFER_SIZE           (BVP_SAMPLE_RATE * WINDOW_SECONDS)    // 240
+#define ACC_BUFFER_SIZE           (ACC_SAMPLE_RATE * WINDOW_SECONDS)    // 240
 #define EDA_BUFFER_SIZE           (EDA_SAMPLE_RATE * WINDOW_SECONDS)    // 240
 #define TEMP_BUFFER_SIZE          (TEMP_SAMPLE_RATE * WINDOW_SECONDS)   // 240
 
