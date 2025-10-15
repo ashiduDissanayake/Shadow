@@ -1,0 +1,6 @@
+numpy>=1.26
+pandas>=2.2
+pyarrow>=15.0
+flirt>=0.0.2
+tqdm>=4.66
+neurokit2>=0.2.7

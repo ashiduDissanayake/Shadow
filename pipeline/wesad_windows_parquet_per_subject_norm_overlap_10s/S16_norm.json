@@ -1,0 +1,51 @@
+{
+  "subject": "S16",
+  "normalize_mode": "robust",
+  "sampling_rates": {
+    "BVP": 64,
+    "EDA": 4,
+    "TEMP": 4,
+    "ACC": 32
+  },
+  "window_s": 60.0,
+  "step_s": 50.0,
+  "stats": {
+    "mode": "robust",
+    "BVP": {
+      "mode": "robust",
+      "median": 1.409999966621399,
+      "mad": 8.789999961853027,
+      "scale": 13.03205394744873
+    },
+    "EDA": {
+      "mode": "robust",
+      "median": 0.4621320068836212,
+      "mad": 0.16658902168273926,
+      "scale": 0.24698488414287567
+    },
+    "TEMP": {
+      "mode": "robust",
+      "median": 30.59000015258789,
+      "mad": 0.45999908447265625,
+      "scale": 0.681994616985321
+    },
+    "ACC.X": {
+      "mode": "robust",
+      "median": 37.0,
+      "mad": 12.0,
+      "scale": 17.79119873046875
+    },
+    "ACC.Y": {
+      "mode": "robust",
+      "median": 5.0,
+      "mad": 23.0,
+      "scale": 34.09980010986328
+    },
+    "ACC.Z": {
+      "mode": "robust",
+      "median": 31.0,
+      "mad": 17.0,
+      "scale": 25.204198837280273
+    }
+  }
+}

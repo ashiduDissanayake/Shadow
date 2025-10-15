@@ -1,0 +1,51 @@
+{
+  "subject": "S13",
+  "normalize_mode": "robust",
+  "sampling_rates": {
+    "BVP": 64,
+    "EDA": 4,
+    "TEMP": 4,
+    "ACC": 32
+  },
+  "window_s": 60.0,
+  "step_s": 50.0,
+  "stats": {
+    "mode": "robust",
+    "BVP": {
+      "mode": "robust",
+      "median": 5.079999923706055,
+      "mad": 28.329999923706055,
+      "scale": 42.00205612182617
+    },
+    "EDA": {
+      "mode": "robust",
+      "median": 6.034121036529541,
+      "mad": 2.058016061782837,
+      "scale": 3.0512144565582275
+    },
+    "TEMP": {
+      "mode": "robust",
+      "median": 34.75,
+      "mad": 0.20000076293945312,
+      "scale": 0.2965211272239685
+    },
+    "ACC.X": {
+      "mode": "robust",
+      "median": 40.0,
+      "mad": 17.0,
+      "scale": 25.204198837280273
+    },
+    "ACC.Y": {
+      "mode": "robust",
+      "median": -11.0,
+      "mad": 12.0,
+      "scale": 17.79119873046875
+    },
+    "ACC.Z": {
+      "mode": "robust",
+      "median": 25.0,
+      "mad": 32.0,
+      "scale": 47.443199157714844
+    }
+  }
+}

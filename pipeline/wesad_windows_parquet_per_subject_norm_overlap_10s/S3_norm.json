@@ -1,0 +1,51 @@
+{
+  "subject": "S3",
+  "normalize_mode": "robust",
+  "sampling_rates": {
+    "BVP": 64,
+    "EDA": 4,
+    "TEMP": 4,
+    "ACC": 32
+  },
+  "window_s": 60.0,
+  "step_s": 50.0,
+  "stats": {
+    "mode": "robust",
+    "BVP": {
+      "mode": "robust",
+      "median": 1.0099999904632568,
+      "mad": 7.6399993896484375,
+      "scale": 11.327062606811523
+    },
+    "EDA": {
+      "mode": "robust",
+      "median": 0.47048699855804443,
+      "mad": 0.12819498777389526,
+      "scale": 0.19006188213825226
+    },
+    "TEMP": {
+      "mode": "robust",
+      "median": 31.6299991607666,
+      "mad": 0.7999992370605469,
+      "scale": 1.1860789060592651
+    },
+    "ACC.X": {
+      "mode": "robust",
+      "median": -46.0,
+      "mad": 12.0,
+      "scale": 17.79119873046875
+    },
+    "ACC.Y": {
+      "mode": "robust",
+      "median": -1.0,
+      "mad": 15.0,
+      "scale": 22.23900032043457
+    },
+    "ACC.Z": {
+      "mode": "robust",
+      "median": 12.0,
+      "mad": 21.0,
+      "scale": 31.134599685668945
+    }
+  }
+}

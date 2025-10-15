@@ -1,0 +1,51 @@
+{
+  "subject": "S6",
+  "normalize_mode": "robust",
+  "sampling_rates": {
+    "BVP": 64,
+    "EDA": 4,
+    "TEMP": 4,
+    "ACC": 32
+  },
+  "window_s": 60.0,
+  "step_s": 50.0,
+  "stats": {
+    "mode": "robust",
+    "BVP": {
+      "mode": "robust",
+      "median": 2.5299999713897705,
+      "mad": 13.84999942779541,
+      "scale": 20.534008026123047
+    },
+    "EDA": {
+      "mode": "robust",
+      "median": 2.492135524749756,
+      "mad": 1.4250625371932983,
+      "scale": 2.112797737121582
+    },
+    "TEMP": {
+      "mode": "robust",
+      "median": 32.369998931884766,
+      "mad": 1.0200004577636719,
+      "scale": 1.512252688407898
+    },
+    "ACC.X": {
+      "mode": "robust",
+      "median": 42.0,
+      "mad": 16.0,
+      "scale": 23.721599578857422
+    },
+    "ACC.Y": {
+      "mode": "robust",
+      "median": 2.0,
+      "mad": 11.0,
+      "scale": 16.3085994720459
+    },
+    "ACC.Z": {
+      "mode": "robust",
+      "median": 34.0,
+      "mad": 18.0,
+      "scale": 26.686800003051758
+    }
+  }
+}

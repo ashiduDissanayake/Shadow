@@ -1,0 +1,10 @@
+{
+  "dropped": [
+    "ACC.L2__ACC.L2_n_sign_changes",
+    "BVP.HRV__hrv_n_sign_changes",
+    "BVP.stat__BVP.stat_entropy",
+    "TEMP__TEMP_n_sign_changes",
+    "TEMP__TEMP_peaks"
+  ],
+  "missing_in_all": []
+}

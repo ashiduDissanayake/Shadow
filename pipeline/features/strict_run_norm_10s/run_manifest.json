@@ -1,0 +1,40 @@
+{
+  "started_at": "2025-09-30T07:07:18Z",
+  "data_dir": "/Users/ashidudissanayake/Dev/Shadow/pipeline/wesad_windows_parquet_per_subject_norm_overlap_10s",
+  "out_root": "/Users/ashidudissanayake/Dev/Shadow/pipeline/features/strict_run_norm_10s",
+  "out_subjects_dir": "/Users/ashidudissanayake/Dev/Shadow/pipeline/features/strict_run_norm_10s/subjects",
+  "combined_out": "/Users/ashidudissanayake/Dev/Shadow/pipeline/features/strict_run_norm_10s/ALL_features.parquet",
+  "env": {
+    "FEAT_DATA_DIR": "wesad_windows_parquet_per_subject_norm_overlap_10s",
+    "FEAT_LIMIT": "200",
+    "FEAT_SKIP_HRV": "",
+    "FEAT_SUPPRESS_WARNINGS": "",
+    "FEAT_OVERWRITE": "1",
+    "FEAT_COMBINED_ONLY": "",
+    "FEAT_SUBJECTS": "",
+    "FEAT_EXCLUDE": "",
+    "FEAT_PARQUET_EXT": "",
+    "FEAT_COMBINED_NAME": "",
+    "FEAT_OUT_SUBDIR": "strict_run_norm_10s"
+  },
+  "processed_subjects": [
+    "S10",
+    "S11",
+    "S13",
+    "S14",
+    "S15",
+    "S16",
+    "S17",
+    "S2",
+    "S3",
+    "S4",
+    "S5",
+    "S6",
+    "S7",
+    "S8",
+    "S9"
+  ],
+  "failed_subjects": [],
+  "combined_rows": 1727,
+  "combined_cols": 236
+}
