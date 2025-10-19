@@ -12,6 +12,7 @@ idf_component_register(
         ble_stress_service
         signal_preprocessor  # Added: Phase 2 signal preprocessing
         cnn_inference        # Added: Phase 3 CNN inference
+        display_manager      # Added: TFT display and QR code
         esp_adc          # Added: Required for ESP-IDF v5.5 ADC
         esp_timer        # Moved from PRIV_REQUIRES
         esp_system       # Moved from PRIV_REQUIRES

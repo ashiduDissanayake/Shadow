@@ -12,6 +12,9 @@ struct ShadowDashboardView: View {
     @State private var showingDebugLog = false
     @State private var showingCoreDataDebug = false
     @State private var recentEvents: [StressEvent] = []
+    @State private var showingPairingAlert = false
+    @State private var pairingError: String?
+    @State private var isPairing = false
     
     var body: some View {
         ScrollView {
@@ -45,6 +48,15 @@ struct ShadowDashboardView: View {
         }
         .sheet(isPresented: $showingCoreDataDebug) {
             CoreDataDebugView()
+        }
+        .alert("Device Pairing", isPresented: $showingPairingAlert) {
+            Button("OK") { }
+        } message: {
+            if let error = pairingError {
+                Text("Pairing failed: \(error)")
+            } else {
+                Text("Device paired successfully! ✅")
+            }
         }
         .onAppear {
             syncViewModel.start()
@@ -102,6 +114,12 @@ struct ShadowDashboardView: View {
                 statusRow("Last Sync", syncViewModel.lastSync, systemColor: .secondary)
                 statusRow("Sequence Info", syncViewModel.sequenceStatus, systemColor: .secondary)
                 statusRow("Events Received", "\(syncViewModel.eventsReceived)", systemColor: .secondary)
+                
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
+                // Pairing Section
+                pairingSection
             }
             
             HStack(spacing: 12) {
@@ -257,6 +275,92 @@ struct ShadowDashboardView: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(systemColor ?? .white)
+        }
+    }
+    
+    // MARK: Pairing Section
+    private var pairingSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "lock.shield")
+                    .foregroundColor(syncViewModel.manager.isPaired ? .green : .orange)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Device Pairing")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                    
+                    if let deviceInfo = syncViewModel.manager.deviceInfo {
+                        Text("\(deviceInfo.deviceName) - \(deviceInfo.firmwareVersion)")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                    } else {
+                        Text("Not paired")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+                
+                Spacer()
+                
+                // Pairing state indicator
+                HStack(spacing: 4) {
+                    Text(syncViewModel.manager.pairingState.emoji)
+                    Text(syncViewModel.manager.pairingState.description)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+            
+            // Pairing button
+            if !syncViewModel.manager.isPaired {
+                Button(action: {
+                    isPairing = true
+                    Task {
+                        do {
+                            try await syncViewModel.manager.performPairing()
+                            isPairing = false
+                            pairingError = nil
+                            showingPairingAlert = true
+                        } catch {
+                            isPairing = false
+                            pairingError = error.localizedDescription
+                            showingPairingAlert = true
+                        }
+                    }
+                }) {
+                    HStack {
+                        if isPairing {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "key.fill")
+                        }
+                        Text(isPairing ? "Pairing..." : "Pair Device")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(isPairing ? Color.blue.opacity(0.6) : Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .disabled(isPairing || syncViewModel.manager.pairingState == .pending)
+            } else {
+                // Show paired status
+                HStack {
+                    Image(systemName: "checkmark.shield.fill")
+                        .foregroundColor(.green)
+                    Text("Device Paired")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+            }
         }
     }
 }

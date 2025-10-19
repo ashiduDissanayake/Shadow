@@ -19,9 +19,22 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     @Published var currentStableState: UInt8 = 0   // 0=CALM 1=STRESS
     @Published var logLines: [String] = []
     
+    // Pairing-related published properties
+    @Published var isPaired: Bool = false
+    @Published var pairingState: PairingState = .idle
+    @Published var deviceInfo: DeviceInfo?
+    
     // MARK: Config
     private let serviceUUID = CBUUID(string: "A000")
     private let eventCharUUID = CBUUID(string: "A002")
+    
+    // Pairing Service UUIDs
+    private let pairingServiceUUID = CBUUID(string: "B000")
+    private let deviceInfoCharUUID = CBUUID(string: "B001")
+    private let pairingStateCharUUID = CBUUID(string: "B002")
+    private let pairingControlCharUUID = CBUUID(string: "B003")
+    private let securityChallengeCharUUID = CBUUID(string: "B004")
+    
     private let ringBufferCapacity: UInt8 = 32
     private let resetOpcode: UInt8 = 0xFF
     private let resetMagic: UInt8 = 0x52
@@ -36,6 +49,13 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
     private var eventChar: CBCharacteristic?
+    
+    // Pairing characteristics
+    private var deviceInfoChar: CBCharacteristic?
+    private var pairingStateChar: CBCharacteristic?
+    private var pairingControlChar: CBCharacteristic?
+    private var securityChallengeChar: CBCharacteristic?
+    private var pendingChallenge: SecurityChallenge?
     
     // Internal
     private var advSeq: UInt8 = 0
@@ -275,6 +295,173 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
         logLines.append(line)
         if logLines.count > 500 { logLines.removeFirst(logLines.count - 500) }
     }
+    
+    // MARK: - Pairing Methods
+    
+    /// Perform pairing with Shadow device
+    func performPairing() async throws {
+        guard let peripheral = peripheral else {
+            throw PairingError.deviceNotConnected
+        }
+        
+        log("🔐 Starting pairing process...")
+        
+        // Step 1: Read device info
+        guard let deviceInfoChar = deviceInfoChar else {
+            throw PairingError.characteristicNotFound
+        }
+        
+        let deviceInfoData = try await readCharacteristic(deviceInfoChar, from: peripheral)
+        guard let info = DeviceInfo(from: deviceInfoData) else {
+            throw PairingError.invalidData
+        }
+        self.deviceInfo = info
+        
+        log("📱 Shadow Device: \(info.deviceName)")
+        log("🆔 Device ID: \(info.deviceIDHex)")
+        log("🔧 Firmware: \(info.firmwareVersion)")
+        log("⚙️ Hardware: \(info.hardwareRevision)")
+        
+        // Step 2: Send pair request
+        guard let pairingControlChar = pairingControlChar else {
+            throw PairingError.characteristicNotFound
+        }
+        
+        let pairCommand = Data([PairingCommand.pairRequest.rawValue])
+        try await writeCharacteristic(pairingControlChar, value: pairCommand, to: peripheral)
+        log("📤 Sent pairing request")
+        
+        // Step 3: Wait for pairing state to change to PENDING
+        try await waitForPairingState(.pending, timeout: 5.0)
+        log("⏳ Pairing state: PENDING")
+        
+        // Step 4: Read challenge
+        guard let securityChallengeChar = securityChallengeChar else {
+            throw PairingError.characteristicNotFound
+        }
+        
+        let challengeData = try await readCharacteristic(securityChallengeChar, from: peripheral)
+        guard let challenge = SecurityChallenge(from: challengeData) else {
+            throw PairingError.invalidData
+        }
+        self.pendingChallenge = challenge
+        
+        log("🔐 Received challenge (timestamp: \(challenge.timestamp))")
+        
+        // Step 5: Compute response
+        let clientDeviceID = PairingHelper.getOrCreateClientDeviceID()
+        let clientName = PairingHelper.getClientDeviceName()
+        
+        let responseData = PairingHelper.prepareChallengeResponse(
+            challenge: challenge.challenge,
+            shadowDeviceID: info.deviceID,
+            clientDeviceID: clientDeviceID,
+            clientName: clientName
+        )
+        
+        // Step 6: Send response
+        try await writeCharacteristic(securityChallengeChar, value: responseData, to: peripheral)
+        log("📤 Sent challenge response")
+        
+        // Step 7: Wait for pairing state to change to PAIRED
+        try await waitForPairingState(.paired, timeout: 5.0)
+        
+        log("✅ Pairing successful!")
+        isPaired = true
+        
+        // Save pairing info
+        PairingHelper.savePairingInfo(deviceInfo: info, clientDeviceID: clientDeviceID)
+    }
+    
+    /// Wait for pairing state to change to target state
+    private func waitForPairingState(_ targetState: PairingState, timeout: TimeInterval) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        
+        while Date() < deadline {
+            if pairingState == targetState {
+                return
+            }
+            
+            if pairingState == .rejected {
+                throw PairingError.rejected
+            }
+            
+            try await Task.sleep(nanoseconds: 100_000_000)  // 100ms
+        }
+        
+        throw PairingError.timeout
+    }
+    
+    /// Read characteristic value (async wrapper)
+    private func readCharacteristic(_ characteristic: CBCharacteristic, 
+                                   from peripheral: CBPeripheral) async throws -> Data {
+        return try await withCheckedThrowingContinuation { continuation in
+            var observer: NSObjectProtocol?
+            
+            observer = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let observer = observer {
+                    NotificationCenter.default.removeObserver(observer)
+                }
+                
+                if let error = notification.userInfo?["error"] as? Error {
+                    continuation.resume(throwing: error)
+                } else if let data = notification.userInfo?["data"] as? Data {
+                    continuation.resume(returning: data)
+                } else {
+                    continuation.resume(throwing: PairingError.invalidData)
+                }
+            }
+            
+            peripheral.readValue(for: characteristic)
+            
+            // Timeout after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                if let observer = observer {
+                    NotificationCenter.default.removeObserver(observer)
+                    continuation.resume(throwing: PairingError.timeout)
+                }
+            }
+        }
+    }
+    
+    /// Write characteristic value (async wrapper)
+    private func writeCharacteristic(_ characteristic: CBCharacteristic,
+                                    value: Data,
+                                    to peripheral: CBPeripheral) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            var observer: NSObjectProtocol?
+            
+            observer = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let observer = observer {
+                    NotificationCenter.default.removeObserver(observer)
+                }
+                
+                if let error = notification.userInfo?["error"] as? Error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+            
+            peripheral.writeValue(value, for: characteristic, type: .withResponse)
+            
+            // Timeout after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                if let observer = observer {
+                    NotificationCenter.default.removeObserver(observer)
+                    continuation.resume(throwing: PairingError.timeout)
+                }
+            }
+        }
+    }
 }
 
 // MARK: - CBCentralManagerDelegate
@@ -340,6 +527,14 @@ extension LightShadowBLEManager: CBPeripheralDelegate {
         peripheral.services?.forEach {
             if $0.uuid == serviceUUID {
                 peripheral.discoverCharacteristics([eventCharUUID], for: $0)
+            } else if $0.uuid == pairingServiceUUID {
+                // Discover all pairing characteristics
+                peripheral.discoverCharacteristics([
+                    deviceInfoCharUUID,
+                    pairingStateCharUUID,
+                    pairingControlCharUUID,
+                    securityChallengeCharUUID
+                ], for: $0)
             }
         }
     }
@@ -354,11 +549,38 @@ extension LightShadowBLEManager: CBPeripheralDelegate {
             return
         }
         service.characteristics?.forEach {
+            // Stress service characteristics
             if $0.uuid == eventCharUUID {
                 eventChar = $0
             }
+            // Pairing service characteristics
+            else if $0.uuid == deviceInfoCharUUID {
+                deviceInfoChar = $0
+                log("📋 Found Device Info characteristic")
+            }
+            else if $0.uuid == pairingStateCharUUID {
+                pairingStateChar = $0
+                // Subscribe to pairing state notifications
+                peripheral.setNotifyValue(true, for: $0)
+                log("🔔 Subscribed to Pairing State notifications")
+            }
+            else if $0.uuid == pairingControlCharUUID {
+                pairingControlChar = $0
+                log("📋 Found Pairing Control characteristic")
+            }
+            else if $0.uuid == securityChallengeCharUUID {
+                securityChallengeChar = $0
+                log("🔐 Found Security Challenge characteristic")
+            }
         }
+        
+        // Original stress service logic
         guard eventChar != nil else {
+            // If pairing characteristics found, that's okay - we're in pairing mode
+            if deviceInfoChar != nil {
+                log("Pairing service discovered, stress service not required yet")
+                return
+            }
             log("Event characteristic missing")
             status = .error
             disconnect()
@@ -376,8 +598,19 @@ extension LightShadowBLEManager: CBPeripheralDelegate {
                     error: Error?) {
         if let error {
             log("Write error: \(error.localizedDescription)")
+            // Post notification for async write failure
+            NotificationCenter.default.post(
+                name: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
+                object: nil,
+                userInfo: ["error": error]
+            )
         } else {
             log("Write OK")
+            // Post notification for async write success
+            NotificationCenter.default.post(
+                name: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
+                object: nil
+            )
         }
     }
     
@@ -387,10 +620,40 @@ extension LightShadowBLEManager: CBPeripheralDelegate {
         if let error {
             log("Read error: \(error.localizedDescription)")
             status = .error
+            
+            // Post notification for async read failure
+            NotificationCenter.default.post(
+                name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
+                object: nil,
+                userInfo: ["error": error]
+            )
             return
         }
         guard let data = characteristic.value else { return }
         
+        // Handle pairing characteristics
+        if characteristic.uuid == pairingStateCharUUID {
+            if let stateInfo = PairingStateInfo(from: data) {
+                pairingState = stateInfo.state
+                log("🔐 Pairing state: \(stateInfo.state) (\(stateInfo.pairedCount)/\(stateInfo.maxPaired) paired)")
+            }
+            // Post notification for async read success
+            NotificationCenter.default.post(
+                name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
+                object: nil,
+                userInfo: ["data": data]
+            )
+            return
+        }
+        
+        // Post notification for async reads (device info, challenge, etc.)
+        NotificationCenter.default.post(
+            name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
+            object: nil,
+            userInfo: ["data": data]
+        )
+        
+        // Original stress service logic continues below
         if pendingReset {
             if handleResetAck(data) {
                 disconnect()

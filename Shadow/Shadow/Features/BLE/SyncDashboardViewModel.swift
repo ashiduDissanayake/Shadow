@@ -11,7 +11,7 @@ final class SyncDashboardViewModel: ObservableObject {
     @Published var isActive: Bool = false
     @Published var currentStateLabel: String = "CALM"
     
-    private let manager: LightShadowBLEManager
+    let manager: LightShadowBLEManager  // Made public for pairing access
     private var cancellables = Set<AnyCancellable>()
     
     private let df: DateFormatter = {

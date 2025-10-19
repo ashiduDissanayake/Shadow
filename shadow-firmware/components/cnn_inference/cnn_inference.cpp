@@ -36,14 +36,17 @@ typedef struct {
     bool enable_profiling;
 } cnn_inference_config_t;
 
-// Model data - extern from stress_model_data.c
-extern "C" {
-    extern const unsigned char g_stress_model_data[];
-    extern const unsigned int g_stress_model_data_len;
-}
+// Model data - include INT8 quantized model
+#include "stress_model_int8_esp32.h"
 
 #define STRESS_MODEL_INPUT_CHANNELS 4
 #define STRESS_MODEL_INPUT_TIMESTEPS 240
+
+// Quantization parameters from INT8 model
+#define INPUT_SCALE      0.118650f
+#define INPUT_ZERO_POINT -28
+#define OUTPUT_SCALE     0.003906f
+#define OUTPUT_ZERO_POINT -128
 
 static const char *TAG = "cnn_inference";
 
@@ -94,12 +97,12 @@ int cnn_inference_init(const cnn_inference_config_t *config) {
     
     tflite::InitializeTarget();
     
-    model = tflite::GetModel(g_stress_model_data);
+    model = tflite::GetModel(stress_model_tflite);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
         ESP_LOGE(TAG, "Model version mismatch");
         return -2;
     }
-    ESP_LOGI(TAG, "Model loaded: %u bytes", g_stress_model_data_len);
+    ESP_LOGI(TAG, "Model loaded: %u bytes (INT8 quantized)", stress_model_tflite_len);
     
     static tflite::MicroMutableOpResolver<45> resolver;  // Large enough for all ops
     
@@ -185,11 +188,17 @@ int cnn_inference_predict(const cnn_input_tensor_t *input,
     
     int64_t start_time = esp_timer_get_time();
     
-    float* input_data = input_tensor->data.f;
+    // For INT8 model, quantize float input to INT8
+    int8_t* input_data = input_tensor->data.int8;
     int idx = 0;
     for (int c = 0; c < 4; c++) {
         for (int t = 0; t < 240; t++) {
-            input_data[idx++] = input->data[c][t];
+            // Quantize: int8_value = clamp(float_value / scale + zero_point)
+            float quantized = (input->data[c][t] / INPUT_SCALE) + INPUT_ZERO_POINT;
+            // Clamp to INT8 range [-128, 127]
+            if (quantized < -128.0f) quantized = -128.0f;
+            if (quantized > 127.0f) quantized = 127.0f;
+            input_data[idx++] = (int8_t)quantized;
         }
     }
     
@@ -199,9 +208,12 @@ int cnn_inference_predict(const cnn_input_tensor_t *input,
         return -2;
     }
     
-    float* output_data = output_tensor->data.f;
-    float stress_prob = output_data[0];
+    // For INT8 model, dequantize INT8 output to float
+    int8_t output_quantized = output_tensor->data.int8[0];
+    // Dequantize: float_value = (int8_value - zero_point) * scale
+    float stress_prob = (output_quantized - OUTPUT_ZERO_POINT) * OUTPUT_SCALE;
     
+    // Clamp probability to valid range [0.0, 1.0]
     if (stress_prob < 0.0f) stress_prob = 0.0f;
     if (stress_prob > 1.0f) stress_prob = 1.0f;
     
@@ -211,7 +223,7 @@ int cnn_inference_predict(const cnn_input_tensor_t *input,
     result->inference_time_us = (uint32_t)(end_time - start_time);
     result->success = true;
     
-    ESP_LOGI(TAG, "Inference: %.1f%%, %uus", 
+    ESP_LOGI(TAG, "Inference: %.1f%%, %uus (INT8)", 
              stress_prob * 100.0f, result->inference_time_us);
     
     return 0;
@@ -230,7 +242,7 @@ void cnn_inference_get_memory_stats(size_t *arena_used_bytes,
 void cnn_inference_get_model_info(size_t *model_size_bytes,
                                   int input_shape[3],
                                   int output_shape[2]) {
-    if (model_size_bytes) *model_size_bytes = g_stress_model_data_len;
+    if (model_size_bytes) *model_size_bytes = stress_model_tflite_len;
     if (input_shape) {
         input_shape[0] = 1;   // batch
         input_shape[1] = 4;   // channels

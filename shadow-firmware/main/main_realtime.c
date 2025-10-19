@@ -47,10 +47,14 @@
 #include "stress_fsm.h"             // OLD: Keep for now, will remove later
 #include "event_log.h"
 #include "ble_stress_service.h"
+#include "ble_pairing.h"            // BLE device pairing protocol
+#include "display_manager.h"        // TFT display and QR code
 
 // ==================== PIN CONFIGURATION ====================
 #define I2C_SDA_PIN         44    // T-Display S3 SDA pin
 #define I2C_SCL_PIN         43    // T-Display S3 SCL pin
+#define BUTTON_PIN          14    // T-Display S3 boot button (GPIO 14)
+#define BUTTON_DEBOUNCE_MS  200   // Button debounce time
 #define MAX_INT_PIN         1     // MAX30105 interrupt pin
 #define MPU_INT_PIN         2    // MPU6050 interrupt pin
 #define GSR_ADC_PIN         3     // GSR ADC pin (same as MAX_INT for now)
@@ -114,7 +118,8 @@ static TaskHandle_t consumer_task_handle = NULL;
 static adc_oneshot_unit_handle_t adc_handle;
 static adc_cali_handle_t adc_cali_handle = NULL;
 static gptimer_handle_t gsr_timer = NULL;
-static gptimer_handle_t max_poll_timer = NULL;  // Timer for MAX30105 polling backup
+static gptimer_handle_t max_poll_timer = NULL;  // RE-ENABLED - interrupt approach unreliable
+static gptimer_handle_t temp_timer = NULL;       // Timer for temperature sampling
 static QueueHandle_t sensor_event_queue;
 
 /* Feature extraction workspace */
@@ -128,6 +133,13 @@ static event_log_context_t g_event_log;
 static bool max_available = false;
 static bool mpu_available = false;
 static bool gsr_available = false;
+
+/* Display and device info */
+static display_device_info_t g_device_info = {
+    .device_name = "Shadow-9026",
+    .password = "12345678"
+};
+static volatile int64_t last_button_press = 0;
 static bool adc_calibrated = false;
 
 /* Sensor statistics */
@@ -152,7 +164,8 @@ typedef enum {
     SENSOR_EVENT_MPU_DATA_READY,
     SENSOR_EVENT_GSR_TIMER,
     SENSOR_EVENT_TEMP_TIMER,
-    SENSOR_EVENT_MAX_POLL,  // Polling backup for MAX30105
+    SENSOR_EVENT_MAX_POLL,  // Re-enabled for polling-based sampling
+    SENSOR_EVENT_BUTTON_PRESS,  // Button press to toggle display
 } sensor_event_type_t;
 
 typedef struct {
@@ -172,7 +185,8 @@ static bool i2c_read_bytes(uint8_t device_addr, uint8_t reg_addr, uint8_t *data,
 static bool i2c_read_byte(uint8_t device_addr, uint8_t reg_addr, uint8_t *data);
 static bool i2c_write_byte(uint8_t device_addr, uint8_t reg_addr, uint8_t data);
 static bool gsr_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);
-static bool max_poll_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);  // MAX30105 polling
+// static bool max_poll_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);  // DISABLED
+static bool temp_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);     // Temperature sampling
 static void max_interrupt_handler(void *arg);
 static void mpu_interrupt_handler(void *arg);
 void producer_task(void *param);
@@ -184,8 +198,14 @@ int extract_features_realtime(realtime_sensor_system_t *sensor_system,
                               feature_vector_t *result);
 
 /* ================= INTERRUPT HANDLERS ================= */
+
+// MAX30105 uses hardware averaging (50 SPS / 16 avg = 3.125 Hz effective rate)
+// This is close enough to our 4Hz target without software decimation
+
 static void IRAM_ATTR max_interrupt_handler(void *arg) {
     static uint32_t max_sequence = 0;
+    
+    // Process every interrupt - hardware averaging already reduces rate to ~3.1Hz
     sensor_event_t event = {
         .type = SENSOR_EVENT_MAX_DATA_READY,
         .timestamp_us = esp_timer_get_time(),
@@ -212,6 +232,33 @@ static void IRAM_ATTR mpu_interrupt_handler(void *arg) {
     }
 }
 
+/**
+ * Button interrupt handler - Toggle display mode
+ * Debounced in ISR to avoid multiple triggers
+ */
+static void IRAM_ATTR button_interrupt_handler(void *arg) {
+    int64_t now = esp_timer_get_time() / 1000;  // Convert to ms
+    
+    // Debounce: ignore if button pressed within last BUTTON_DEBOUNCE_MS
+    if (now - last_button_press < BUTTON_DEBOUNCE_MS) {
+        return;
+    }
+    
+    last_button_press = now;
+    
+    // Send button press event
+    sensor_event_t event = {
+        .type = SENSOR_EVENT_BUTTON_PRESS,  // Will need to add this enum
+        .timestamp_us = esp_timer_get_time(),
+        .sequence = 0
+    };
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
+    }
+}
+
 static bool IRAM_ATTR gsr_timer_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx) {
     static uint32_t gsr_sequence = 0;
     sensor_event_t event = {
@@ -224,12 +271,26 @@ static bool IRAM_ATTR gsr_timer_callback(gptimer_handle_t timer, const gptimer_a
     return (xHigherPriorityTaskWoken == pdTRUE);
 }
 
+/* MAX30105 polling timer callback - RE-ENABLED (interrupt approach unreliable) */
 static bool IRAM_ATTR max_poll_timer_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx) {
     static uint32_t max_poll_sequence = 0;
     sensor_event_t event = {
         .type = SENSOR_EVENT_MAX_POLL,
         .timestamp_us = esp_timer_get_time(),
         .sequence = ++max_poll_sequence
+    };
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
+    return (xHigherPriorityTaskWoken == pdTRUE);
+}
+
+
+static bool IRAM_ATTR temp_timer_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx) {
+    static uint32_t temp_sequence = 0;
+    sensor_event_t event = {
+        .type = SENSOR_EVENT_TEMP_TIMER,
+        .timestamp_us = esp_timer_get_time(),
+        .sequence = ++temp_sequence
     };
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
@@ -570,27 +631,36 @@ static bool max30105_enhanced_init(void) {
         return false;
     }
     
-    // FIFO Configuration: Sample averaging = 1, FIFO rollover enabled, FIFO almost full = 15
-    if (!i2c_write_byte(MAX30105_ADDR, 0x08, 0x4F)) {
+    // FIFO Configuration: Sample averaging = 8, FIFO rollover enabled, FIFO almost full = 1
+    // Averaging 8 samples with 32 SPS base = 4 Hz exact
+    // 32 SPS base / 8 averaging = 4.0 Hz (matches other sensors perfectly!)
+    if (!i2c_write_byte(MAX30105_ADDR, 0x08, 0x71)) {  // 0x71 = averaging 8 (bits[7:5]=011), rollover enabled, almost full at 1
         ESP_LOGE(TAG_MAX, "FIFO config failed");
         return false;
     }
     
-    // Mode Configuration: Heart Rate mode (RED only)
+    // Mode Configuration: Heart Rate mode (IR LED for MAX30102)
+    // MAX30102 only has RED and IR LEDs (no GREEN!)
+    // 0x02 = Heart Rate mode (RED only)
+    // 0x03 = SpO2 mode (RED + IR)
+    // Using mode 0x02 (RED only) for simplicity and better BVP signal
     if (!i2c_write_byte(MAX30105_ADDR, 0x09, 0x02)) {
         ESP_LOGE(TAG_MAX, "Mode config failed");
         return false;
     }
     
-    // SpO2 Configuration: 100 SPS, 411μs pulse width, ADC range 4096nA
-    if (!i2c_write_byte(MAX30105_ADDR, 0x0A, 0x27)) {
-        ESP_LOGE(TAG_MAX, "SpO2 config failed");
+    // SpO2 Configuration: 32 SPS, 411μs pulse width, ADC range 4096nA
+    // Note: Despite name, this register controls sample rate for ALL modes
+    // 32 SPS with 8x averaging = 4.0Hz exact (perfect match with ACC/EDA/TEMP!)
+    if (!i2c_write_byte(MAX30105_ADDR, 0x0A, 0x1F)) {  // 0x1F = 32 SPS (bits[6:2]=00111), 411μs, 4096nA
+        ESP_LOGE(TAG_MAX, "Sample rate config failed");
         return false;
     }
     
-    // LED1 (RED) Pulse Amplitude: Medium intensity
-    if (!i2c_write_byte(MAX30105_ADDR, 0x0C, 0x1F)) {
-        ESP_LOGE(TAG_MAX, "LED1 config failed");
+    // LED1 (RED) Pulse Amplitude: Medium-high intensity for BVP signal
+    // MAX30102 uses RED LED for heart rate measurement
+    if (!i2c_write_byte(MAX30105_ADDR, 0x0C, 0x3F)) {
+        ESP_LOGE(TAG_MAX, "LED1 (RED) config failed");
         return false;
     }
     
@@ -610,23 +680,45 @@ static bool max30105_enhanced_init(void) {
     // Debug status after initialization
     max30105_debug_status();
     
-    ESP_LOGI(TAG_MAX, "Enhanced MAX30105 initialized successfully");
+    // CRITICAL: Empty FIFO to clear interrupt pin
+    // During init, samples accumulate and trigger interrupt
+    // We must read them out to allow future interrupts to fire
+    ESP_LOGI(TAG_MAX, "Clearing FIFO to reset interrupt pin...");
+    for (int i = 0; i < 32; i++) {  // FIFO is 32 samples max
+        uint8_t dummy[3];
+        i2c_read_bytes(MAX30105_ADDR, 0x07, dummy, 3);  // Read and discard
+    }
+    
+    // Clear interrupt status again after emptying FIFO
+    i2c_read_byte(MAX30105_ADDR, 0x00, &status1);
+    
+    ESP_LOGI(TAG_MAX, "Enhanced MAX30105 initialized successfully (FIFO cleared)");
     return true;
 }
 
 // Enhanced data reading with better FIFO handling
 static uint32_t max30105_read_fifo_sample(void) {
-    uint8_t status1;
+    // Read FIFO pointers to check if data is available
+    uint8_t fifo_wr, fifo_rd;
     
-    // Check interrupt status first
-    if (!i2c_read_byte(MAX30105_ADDR, 0x00, &status1)) {
+    if (!i2c_read_byte(MAX30105_ADDR, 0x04, &fifo_wr)) {
         return 0;
     }
     
-    // Check if we have data ready (bit 6) or FIFO almost full (bit 7)
-    if ((status1 & 0xC0) == 0) {
-        return 0;  // No data ready
+    if (!i2c_read_byte(MAX30105_ADDR, 0x06, &fifo_rd)) {
+        return 0;
     }
+    
+    // Calculate number of samples in FIFO (32-entry circular buffer)
+    int samples_available = (fifo_wr - fifo_rd) & 0x1F;
+    
+    if (samples_available == 0) {
+        return 0;  // No data in FIFO
+    }
+    
+    // Clear interrupt status by reading (important for next interrupt)
+    uint8_t status1;
+    i2c_read_byte(MAX30105_ADDR, 0x00, &status1);
     
     // Read FIFO data (3 bytes for RED LED)
     uint8_t data[3];
@@ -701,8 +793,10 @@ static bool mpu6050_init(void) {
     }
     vTaskDelay(pdMS_TO_TICKS(10));
     
-    // Set sample rate (32Hz)
-    if (!i2c_write_byte(actual_addr, MPU_REG_SMPLRT_DIV, 31)) {
+    // Set sample rate (4Hz - matching CNN model requirements)
+    // Sample Rate = Gyroscope Output Rate / (1 + SMPLRT_DIV)
+    // For 4Hz: Using 1kHz gyro output / (1 + 249) = 4Hz
+    if (!i2c_write_byte(actual_addr, MPU_REG_SMPLRT_DIV, 249)) {
         ESP_LOGE(TAG_MPU, "Sample rate config failed");
         return false;
     }
@@ -811,9 +905,12 @@ static bool gsr_timer_init(void) {
     return true;
 }
 
-// MAX30105 polling timer (backup for interrupt issues)
+/* ================= MAX30105 POLLING TIMER (RE-ENABLED - INTERRUPT APPROACH UNRELIABLE) ================= */
+// NOTE: Switched from interrupt to polling due to timing issues
+// INT pin stays LOW after FIFO clear, NEGEDGE interrupt never fires
+// Polling approach matches GSR/TEMP timers (proven working at 4Hz)
 static bool max_poll_timer_init(void) {
-    ESP_LOGI(TAG_MAX, "Setting up MAX30105 polling timer for 64Hz (backup)...");
+    ESP_LOGI(TAG_MAX, "Setting up MAX30105 polling timer for %dHz...", BVP_TARGET_HZ);
     
     gptimer_config_t timer_config = {
         .clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -837,8 +934,8 @@ static bool max_poll_timer_init(void) {
         return false;
     }
     
-    // 64Hz sampling = 15625 microseconds period
-    uint64_t period_us = 1000000 / 64;
+    // Calculate period for target Hz (4Hz = 250000 microseconds)
+    uint64_t period_us = 1000000 / BVP_TARGET_HZ;
     gptimer_alarm_config_t alarm_config = {
         .alarm_count = period_us,
         .reload_count = 0,
@@ -863,7 +960,64 @@ static bool max_poll_timer_init(void) {
         return false;
     }
     
-    ESP_LOGI(TAG_MAX, "MAX30105 polling timer started successfully");
+    ESP_LOGI(TAG_MAX, "MAX30105 polling timer started at %dHz", BVP_TARGET_HZ);
+    return true;
+}
+
+
+/* ================= TEMPERATURE TIMER (MOCK/ESP32 INTERNAL) ================= */
+static bool temp_timer_init(void) {
+    ESP_LOGI(TAG, "Setting up temperature timer for %dHz sampling...", TEMP_TARGET_HZ);
+    
+    gptimer_config_t timer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1000000,
+    };
+    
+    esp_err_t err = gptimer_new_timer(&timer_config, &temp_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Temperature timer creation failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    gptimer_event_callbacks_t cbs = {
+        .on_alarm = temp_timer_callback,
+    };
+    
+    err = gptimer_register_event_callbacks(temp_timer, &cbs, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Temperature callback registration failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    // Calculate period for target Hz (4Hz = 250000 microseconds)
+    uint64_t period_us = 1000000 / TEMP_TARGET_HZ;
+    gptimer_alarm_config_t alarm_config = {
+        .alarm_count = period_us,
+        .reload_count = 0,
+        .flags.auto_reload_on_alarm = true,
+    };
+    
+    err = gptimer_set_alarm_action(temp_timer, &alarm_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Temperature alarm config failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    err = gptimer_enable(temp_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Temperature timer enable failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    err = gptimer_start(temp_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Temperature timer start failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    ESP_LOGI(TAG, "Temperature timer started at %dHz (mock/ESP32 internal sensor)", TEMP_TARGET_HZ);
     return true;
 }
 
@@ -873,13 +1027,14 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
     
     sensor_event_t event;
     TickType_t last_stats = xTaskGetTickCount();
-    TickType_t last_manual_poll = xTaskGetTickCount();
+    // Note: last_manual_poll removed - manual polling disabled for interrupt-only sampling
     
     while (1) {
         if (xQueueReceive(sensor_event_queue, &event, pdMS_TO_TICKS(100)) == pdTRUE) {
             
             switch (event.type) {
                 case SENSOR_EVENT_MAX_DATA_READY:
+                case SENSOR_EVENT_MAX_POLL:  // Polling timer event (now primary)
                     if (max_available) {
                         uint32_t ir_value = max30105_read_fifo_sample();
                         if (ir_value > 0) {
@@ -889,10 +1044,9 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                             bvp_sample_count++;
                             total_samples_collected++;
                             
-                            if (bvp_sample_count % 32 == 0) {
-                                ESP_LOGI(TAG_DATA, "[%" PRIu64 "] BVP: %lu → %.2f (#%lu)", 
-                                         event.timestamp_us, ir_value, (float)ir_value, bvp_sample_count);
-                            }
+                            // Log EVERY BVP sample (now decimated to ~4Hz)
+                            ESP_LOGI(TAG_DATA, "[%" PRIu64 "] BVP: %lu → %.2f (#%lu)", 
+                                     event.timestamp_us, ir_value, (float)ir_value, bvp_sample_count);
                         }
                     }
                     break;
@@ -908,11 +1062,10 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                             acc_sample_count++;
                             total_samples_collected += 3;
                             
-                            if (acc_sample_count % 16 == 0) {
-                                float magnitude = sqrtf(ax*ax + ay*ay + az*az);
-                                ESP_LOGI(TAG_DATA, "[%" PRIu64 "] ACC: %.3f,%.3f,%.3f |%.3f| (#%lu)", 
-                                         event.timestamp_us, ax, ay, az, magnitude, acc_sample_count);
-                            }
+                            // Log EVERY ACC sample (now at ~4Hz from MPU)
+                            float magnitude = sqrtf(ax*ax + ay*ay + az*az);
+                            ESP_LOGI(TAG_DATA, "[%" PRIu64 "] ACC: %.3f,%.3f,%.3f |%.3f| (#%lu)", 
+                                     event.timestamp_us, ax, ay, az, magnitude, acc_sample_count);
                         }
                     }
                     break;
@@ -948,36 +1101,20 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                     }
                     break;
                 
-                case SENSOR_EVENT_MAX_POLL:
-                    if (max_available) {
-                        // Check if MAX30105 has data available in FIFO
-                        uint8_t status1;
-                        if (i2c_read_byte(MAX30105_ADDR, 0x00, &status1) && (status1 & 0xC0)) {
-                            uint32_t ir_value = max30105_read_fifo_sample();
-                            if (ir_value > 0) {
-                                // Convert to fixed point and add to ring buffer
-                                realtime_add_sample_int_isr(SENSOR_BVP, ir_value);
-                                bvp_sample_count++;
-                                total_samples_collected++;
-                                
-                                if (bvp_sample_count % 16 == 0) {
-                                    ESP_LOGI(TAG_DATA, "[%" PRIu64 "] BVP: %lu (#%lu)", 
-                                             event.timestamp_us, ir_value, bvp_sample_count);
-                                }
-                            }
-                        }
-                    }
+                case SENSOR_EVENT_BUTTON_PRESS:
+                    // Toggle display mode (clock <-> QR code)
+                    ESP_LOGI(TAG_MAIN, "🔘 Button pressed - toggling display");
+                    display_toggle_mode(&g_device_info);
                     break;
+                
+                /* REMOVED: SENSOR_EVENT_MAX_POLL - MAX30105 uses interrupts only */
+                // Polling timer disabled to prevent double-sampling with interrupts
+                
             }
         } else {
-            // Timeout - try manual polling for MAX30105
-            TickType_t now = xTaskGetTickCount();
-            if ((now - last_manual_poll) >= pdMS_TO_TICKS(100)) {  // Every 100ms
-                if (max_available) {
-                    max30105_manual_poll();
-                }
-                last_manual_poll = now;
-            }
+            // Timeout - MAX30105 manual polling DISABLED
+            // Using interrupt-driven sampling only for precise 3.1Hz rate
+            // Manual polling was causing double-sampling and inflated sample rate
         }
         
         // Stats every 10 seconds
@@ -1001,18 +1138,10 @@ static esp_err_t setup_gpio_interrupts(void) {
         return err;
     }
     
+    // MAX30102: Using polling timer instead of interrupts (interrupt timing issues)
+    // Interrupt approach failed: INT pin stays LOW after FIFO clear, NEGEDGE never fires
     if (max_available) {
-        gpio_config_t max_conf = {
-            .pin_bit_mask = (1ULL << MAX_INT_PIN),
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_ENABLE,
-            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-            .intr_type = GPIO_INTR_NEGEDGE,
-        };
-        
-        ESP_ERROR_CHECK(gpio_config(&max_conf));
-        ESP_ERROR_CHECK(gpio_isr_handler_add(MAX_INT_PIN, max_interrupt_handler, NULL));
-        ESP_LOGI(TAG_MAX, "Interrupt on GPIO%d", MAX_INT_PIN);
+        ESP_LOGI(TAG_MAX, "MAX30102 using polling timer (interrupt disabled)");
     }
     
     if (mpu_available) {
@@ -1028,6 +1157,19 @@ static esp_err_t setup_gpio_interrupts(void) {
         ESP_ERROR_CHECK(gpio_isr_handler_add(MPU_INT_PIN, mpu_interrupt_handler, NULL));
         ESP_LOGI(TAG_MPU, "Interrupt on GPIO%d", MPU_INT_PIN);
     }
+    
+    // Setup button GPIO for display toggle
+    gpio_config_t btn_conf = {
+        .pin_bit_mask = (1ULL << BUTTON_PIN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,  // Button pulls to GND when pressed
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_NEGEDGE,    // Trigger on button press (falling edge)
+    };
+    
+    ESP_ERROR_CHECK(gpio_config(&btn_conf));
+    ESP_ERROR_CHECK(gpio_isr_handler_add(BUTTON_PIN, button_interrupt_handler, NULL));
+    ESP_LOGI(TAG_MAIN, "Button interrupt on GPIO%d", BUTTON_PIN);
     
     return ESP_OK;
 }
@@ -1314,6 +1456,26 @@ void app_main(void) {
         return;
     }
 
+    // Initialize BLE pairing service (separate service for device management)
+    ESP_LOGI(TAG, "🔐 Initializing BLE pairing service...");
+    if (ble_pairing_init(NULL) != 0) {  // NULL = auto-generate device name
+        ESP_LOGE(TAG, "❌ Failed to initialize BLE pairing service");
+        return;
+    }
+    ble_pairing_print_status();  // Print pairing status for debugging
+
+    // Initialize TFT display and show clock
+    ESP_LOGI(TAG, "🖥️  Initializing display...");
+    if (display_init() != ESP_OK) {
+        ESP_LOGE(TAG, "❌ Failed to initialize display");
+        // Continue without display - not critical
+    } else {
+        ESP_LOGI(TAG, "✅ Display initialized - showing clock");
+        // Show clock immediately
+        display_show_clock();
+        // QR code will be shown on button press
+    }
+
     ESP_LOGI(TAG, "✅ Shadow ML Pipeline initialized successfully");
     ESP_LOGI(TAG, "Memory usage: %lu bytes", realtime_get_memory_usage());
 
@@ -1377,9 +1539,16 @@ void app_main(void) {
         gsr_available = false;
     }
     
-    // Setup MAX30105 polling timer if MAX sensor is available (backup for interrupt issues)
+    // Setup MAX30105 polling timer if MAX sensor is available
+    // Switched from interrupt to polling due to timing issues with INT pin
     if (max_available && !max_poll_timer_init()) {
-        ESP_LOGE(TAG_MAX, "MAX polling timer setup failed, relying on interrupts only");
+        ESP_LOGE(TAG_MAX, "MAX poll timer setup failed, disabling MAX sensor");
+        max_available = false;
+    }
+    
+    // Setup temperature timer (always enabled - using mock/ESP32 internal sensor)
+    if (!temp_timer_init()) {
+        ESP_LOGE(TAG, "⚠️  Temperature timer setup failed, temperature data will not be available");
     }
     
     ESP_LOGI(TAG_MAIN, "✅ Hardware initialization complete");
@@ -1408,11 +1577,16 @@ void app_main(void) {
         return;
     }
 
+    /* Log heap status before consumer task creation */
+    ESP_LOGI(TAG, "Free heap before consumer task: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Minimum free heap: %lu bytes", esp_get_minimum_free_heap_size());
+    ESP_LOGI(TAG, "Largest free block: %lu bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
     /* Create consumer task (Core 1) - Handles ML inference and BLE */
     BaseType_t consumer_result = xTaskCreatePinnedToCore(
         consumer_task,
         "shadow_consumer", 
-        32768,                // Large stack for ML operations
+        16384,                // Reduced from 32KB to 16KB (ML tensor arena is in PSRAM)
         NULL,
         3,                    // Lower priority than producer
         &consumer_task_handle,

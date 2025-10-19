@@ -5,3 +5,5 @@ logs/
 __pycache__/
 *.pyo
 results/
+TFT_eSPI/
+working-example/

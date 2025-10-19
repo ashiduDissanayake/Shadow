@@ -1,0 +1,185 @@
+/**
+ * Display Manager Implementation (Simplified)
+ * QR code generation without TFT display for initial testing
+ * TODO: Add proper TFT_eSPI integration after basic testing
+ */
+
+#include "display_manager.h"
+#include "qrcode.h"
+#include "esp_log.h"
+#include "esp_timer.h"
+#include "driver/gpio.h"
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
+
+static const char *TAG = "DISPLAY";
+
+// Display state
+static display_mode_t current_mode = DISPLAY_MODE_CLOCK;
+
+// QR code settings
+#define QR_VERSION        3          // Version 3 = 29x29 modules
+#define QR_SIZE           29         // 29x29 modules for version 3
+
+// TFT backlight pin
+#define TFT_BL  38
+
+esp_err_t display_init(void) {
+    ESP_LOGI(TAG, "Initializing display (simplified mode)...");
+    
+    // Configure backlight GPIO
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << TFT_BL),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
+    
+    // Turn on backlight
+    gpio_set_level(TFT_BL, 1);
+    
+    // Show initial "clock" (just log for now)
+    display_show_clock();
+    
+    ESP_LOGI(TAG, "Display initialized (serial output mode)");
+    ESP_LOGI(TAG, "TODO: Integrate TFT_eSPI library for actual display output");
+    return ESP_OK;
+}
+
+esp_err_t display_show_qr_code(const display_device_info_t *info) {
+    if (!info || !info->device_name || !info->device_password) {
+        ESP_LOGE(TAG, "Invalid device info");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    ESP_LOGI(TAG, "Generating QR code for %s", info->device_name);
+    
+    // Create QR data string: "device_name:device_password"
+    char qr_data[128];
+    snprintf(qr_data, sizeof(qr_data), "%s:%s", 
+             info->device_name, info->device_password);
+    
+    ESP_LOGI(TAG, "QR Data: %s", qr_data);
+    
+    // Allocate QR code buffer
+    uint8_t qr_bytes[qrcode_getBufferSize(QR_VERSION)];
+    QRCode qrcode;
+    
+    // Generate QR code
+    int8_t result = qrcode_initText(&qrcode, qr_bytes, QR_VERSION, ECC_MEDIUM, qr_data);
+    if (result != 0) {
+        ESP_LOGE(TAG, "Failed to generate QR code: %d", result);
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGI(TAG, "QR Code generated successfully (%dx%d)", qrcode.size, qrcode.size);
+    
+    // Print QR code to serial (ASCII art)
+    ESP_LOGI(TAG, "╔════════════════════════════════════╗");
+    ESP_LOGI(TAG, "║        SCAN TO PAIR                 ║");
+    ESP_LOGI(TAG, "╠════════════════════════════════════╣");
+    
+    for (uint8_t y = 0; y < qrcode.size; y++) {
+        char line[256] = "║ ";
+        int pos = 2;
+        for (uint8_t x = 0; x < qrcode.size; x++) {
+            bool module = qrcode_getModule(&qrcode, x, y);
+            // Use Unicode block characters for better visualization
+            line[pos++] = module ? '█' : ' ';
+            line[pos++] = module ? '█' : ' ';
+        }
+        line[pos++] = ' ';
+        line[pos++] = '║';
+        line[pos] = '\0';
+        ESP_LOGI(TAG, "%s", line);
+    }
+    
+    ESP_LOGI(TAG, "╠════════════════════════════════════╣");
+    ESP_LOGI(TAG, "║ Device: %-26s ║", info->device_name);
+    ESP_LOGI(TAG, "║ Password: %-24s ║", info->device_password);
+    ESP_LOGI(TAG, "╚════════════════════════════════════╝");
+    
+    current_mode = DISPLAY_MODE_QR;
+    ESP_LOGI(TAG, "✅ QR code displayed (in serial monitor)");
+    ESP_LOGI(TAG, "📱 Scan with phone to test: %s", qr_data);
+    
+    return ESP_OK;
+}
+
+esp_err_t display_show_clock(void) {
+    ESP_LOGI(TAG, "Showing clock display");
+    
+    // Get current time
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    
+    // Print clock to serial
+    ESP_LOGI(TAG, "╔════════════════════════════════════╗");
+    ESP_LOGI(TAG, "║            SHADOW                   ║");
+    ESP_LOGI(TAG, "║                                     ║");
+    ESP_LOGI(TAG, "║         %02d:%02d                      ║", timeinfo.tm_hour, timeinfo.tm_min);
+    ESP_LOGI(TAG, "║      %02d/%02d/%04d                    ║", 
+             timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+    ESP_LOGI(TAG, "║                                     ║");
+    ESP_LOGI(TAG, "║       Monitoring ♥                  ║");
+    ESP_LOGI(TAG, "╚════════════════════════════════════╝");
+    
+    current_mode = DISPLAY_MODE_CLOCK;
+    
+    return ESP_OK;
+}
+
+esp_err_t display_show_status(const char *message) {
+    if (!message) {
+        ESP_LOGE(TAG, "Invalid message");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    ESP_LOGI(TAG, "╔════════════════════════════════════╗");
+    ESP_LOGI(TAG, "║ %-35s ║", message);
+    ESP_LOGI(TAG, "╚════════════════════════════════════╝");
+    
+    current_mode = DISPLAY_MODE_STATUS;
+    
+    return ESP_OK;
+}
+
+esp_err_t display_toggle_mode(const display_device_info_t *info) {
+    ESP_LOGI(TAG, "Toggling display mode (current: %s)", 
+             current_mode == DISPLAY_MODE_CLOCK ? "CLOCK" : "QR");
+    
+    if (current_mode == DISPLAY_MODE_CLOCK) {
+        return display_show_qr_code(info);
+    } else {
+        return display_show_clock();
+    }
+}
+
+esp_err_t display_set_brightness(uint8_t brightness) {
+    // Simple on/off for now
+    if (brightness > 0) {
+        gpio_set_level(TFT_BL, 1);
+        ESP_LOGI(TAG, "Backlight ON");
+    } else {
+        gpio_set_level(TFT_BL, 0);
+        ESP_LOGI(TAG, "Backlight OFF");
+    }
+    
+    return ESP_OK;
+}
+
+display_mode_t display_get_mode(void) {
+    return current_mode;
+}
+
+esp_err_t display_update_clock(void) {
+    if (current_mode == DISPLAY_MODE_CLOCK) {
+        return display_show_clock();
+    }
+    return ESP_OK;
+}
