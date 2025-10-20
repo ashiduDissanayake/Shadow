@@ -7,6 +7,7 @@
  */
 
 #include "ble_pairing.h"
+#include "time_sync.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_random.h"
@@ -49,6 +50,7 @@ static void generate_challenge(security_challenge_t *challenge);
 static bool verify_challenge_response(const uint8_t *response);
 static int find_free_slot(void);
 static int find_paired_device(const uint8_t *device_id);
+static void on_time_sync_write(esp_ble_gatts_cb_param_t *param);
 static void prepare_device_info_response(uint8_t *buffer, uint16_t *len);
 static void prepare_pairing_state_response(uint8_t *buffer, uint16_t *len);
 static void handle_pairing_command(uint8_t command, const uint8_t *data, uint16_t len);
@@ -589,6 +591,47 @@ static void on_security_challenge_write(esp_ble_gatts_cb_param_t *param) {
     ble_pairing_notify_state_change();
 }
 
+/**
+ * @brief Handle time synchronization write from macOS
+ * 
+ * Payload: 12 bytes
+ *   Bytes 0-7: Unix timestamp in milliseconds (uint64_t, little-endian)
+ *   Bytes 8-11: Timezone offset in seconds (int32_t, little-endian)
+ */
+static void on_time_sync_write(esp_ble_gatts_cb_param_t *param) {
+    if (param->write.len != 12) {
+        ESP_LOGW(TAG, "Invalid time sync payload length: %d (expected 12)", param->write.len);
+        esp_ble_gatts_send_response(g_pairing_ctx.gatts_if, param->write.conn_id,
+                                    param->write.trans_id, ESP_GATT_INVALID_ATTR_LEN, NULL);
+        return;
+    }
+
+    const uint8_t *data = param->write.value;
+    
+    // Parse Unix timestamp (little-endian uint64_t)
+    uint64_t unix_timestamp_ms;
+    memcpy(&unix_timestamp_ms, data, 8);
+    
+    // Parse timezone offset (little-endian int32_t)
+    int32_t timezone_offset_sec;
+    memcpy(&timezone_offset_sec, data + 8, 4);
+    
+    // Set time in time sync component
+    int ret = time_sync_set_time(unix_timestamp_ms, timezone_offset_sec);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "Failed to set time: %d", ret);
+        esp_ble_gatts_send_response(g_pairing_ctx.gatts_if, param->write.conn_id,
+                                    param->write.trans_id, ESP_GATT_ERROR, NULL);
+        return;
+    }
+    
+    ESP_LOGI(TAG, "✅ Time synchronized successfully");
+    
+    // Send success response
+    esp_ble_gatts_send_response(g_pairing_ctx.gatts_if, param->write.conn_id,
+                                param->write.trans_id, ESP_GATT_OK, NULL);
+}
+
 /* Public GATT callback - called by stress service dispatcher */
 void ble_pairing_gatts_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                                 esp_ble_gatts_cb_param_t *param) {
@@ -609,7 +652,7 @@ void ble_pairing_gatts_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_i
                         }
                     }
                 };
-                esp_ble_gatts_create_service(gatts_if, &service_id, 10);
+                esp_ble_gatts_create_service(gatts_if, &service_id, 12);  // Increased for time sync characteristic
             }
             break;
         }
@@ -675,7 +718,7 @@ void ble_pairing_gatts_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_i
                 } else if (param->add_char.char_uuid.uuid.uuid16 == PAIRING_CONTROL_CHAR_UUID) {
                     g_pairing_ctx.pairing_control_handle = param->add_char.attr_handle;
                     
-                    /* Add last characteristic: Security Challenge */
+                    /* Add next characteristic: Security Challenge */
                     esp_bt_uuid_t uuid = {
                         .len = ESP_UUID_LEN_16,
                         .uuid = { .uuid16 = SECURITY_CHALLENGE_CHAR_UUID }
@@ -686,7 +729,19 @@ void ble_pairing_gatts_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_i
                                            NULL, NULL);
                 } else if (param->add_char.char_uuid.uuid.uuid16 == SECURITY_CHALLENGE_CHAR_UUID) {
                     g_pairing_ctx.security_challenge_handle = param->add_char.attr_handle;
-                    ESP_LOGI(TAG, "All pairing characteristics added successfully");
+                    
+                    /* Add last characteristic: Time Sync */
+                    esp_bt_uuid_t uuid = {
+                        .len = ESP_UUID_LEN_16,
+                        .uuid = { .uuid16 = TIME_SYNC_CHAR_UUID }
+                    };
+                    esp_ble_gatts_add_char(g_pairing_ctx.service_handle, &uuid,
+                                           ESP_GATT_PERM_WRITE,
+                                           ESP_GATT_CHAR_PROP_BIT_WRITE,
+                                           NULL, NULL);
+                } else if (param->add_char.char_uuid.uuid.uuid16 == TIME_SYNC_CHAR_UUID) {
+                    g_pairing_ctx.time_sync_handle = param->add_char.attr_handle;
+                    ESP_LOGI(TAG, "All pairing characteristics added successfully (including time sync)");
                 }
             }
             break;
@@ -737,6 +792,8 @@ void ble_pairing_gatts_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_i
                 on_pairing_control_write(param);
             } else if (param->write.handle == g_pairing_ctx.security_challenge_handle) {
                 on_security_challenge_write(param);
+            } else if (param->write.handle == g_pairing_ctx.time_sync_handle) {
+                on_time_sync_write(param);
             }
             break;
         }

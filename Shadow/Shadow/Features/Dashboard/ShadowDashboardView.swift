@@ -11,6 +11,7 @@ struct ShadowDashboardView: View {
     
     @State private var showingDebugLog = false
     @State private var recentEvents: [StressEvent] = []
+    @State private var graphEvents: [StressEvent] = []
     @State private var showQRScanner = false
     
     var body: some View {
@@ -19,8 +20,8 @@ struct ShadowDashboardView: View {
                 headerSection
                 shadowStatusSection
                 
-                if !recentEvents.isEmpty {
-                    recentEventsSection
+                if !graphEvents.isEmpty {
+                    stressGraphSection
                 }
                 
                 Spacer(minLength: 20)
@@ -52,10 +53,39 @@ struct ShadowDashboardView: View {
         .onAppear {
             syncViewModel.start()
             recentEvents = syncViewModel.getRecentEvents()
+            graphEvents = syncViewModel.getEventsInLastHours(3)
+            print("📊 [Dashboard] Initial load: \(recentEvents.count) recent, \(graphEvents.count) graph events")
         }
-        .onReceive(syncViewModel.$eventsReceived) { _ in
+        .onReceive(syncViewModel.$eventUpdateTrigger) { uuid in
             recentEvents = syncViewModel.getRecentEvents()
+            graphEvents = syncViewModel.getEventsInLastHours(3)
+            print("📊 [Dashboard] UI update triggered (uuid=\(uuid)): \(recentEvents.count) recent, \(graphEvents.count) graph events")
         }
+    }
+    
+    // MARK: - Graph Section
+    private var stressGraphSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.title3)
+                    .foregroundColor(.purple)
+                Text("Stress Timeline (Last 3 Hours)")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                Spacer()
+                Text("\(graphEvents.count) events")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
+            StressStateGraphView.chartView(for: StressStateGraphView.fromCoreData(graphEvents))
+                .frame(height: 200)
+                .id(graphEvents.map { "\($0.sequenceNumber)-\($0.stressState)" }.joined())
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial))
     }
     
     // MARK: Header
@@ -66,14 +96,6 @@ struct ShadowDashboardView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                
-                Spacer()
-                
-                Button(action: onShowProfile) {
-                    Image(systemName: "person.circle")
-                        .font(.title2)
-                        .foregroundColor(.white.opacity(0.8))
-                }
             }
             Text("Shadow stress monitoring dashboard")
                 .font(.subheadline)
@@ -128,10 +150,8 @@ struct ShadowDashboardView: View {
                 
                 if syncViewModel.manager.isPairedToDevice {
                     Button("Forget") {
-                        Task {
-                            try? await syncViewModel.manager.unpairDevice()
-                            UserDefaults.standard.removeObject(forKey: "paired_device_id")
-                        }
+                        syncViewModel.manager.unpairDevice()
+                        UserDefaults.standard.removeObject(forKey: "paired_device_id")
                     }
                     .buttonStyle(ShadowButtonStyle(color: .red))
                 }

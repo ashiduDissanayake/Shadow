@@ -34,6 +34,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private let pairingStateCharUUID = CBUUID(string: "B002")
     private let pairingControlCharUUID = CBUUID(string: "B003")
     private let securityChallengeCharUUID = CBUUID(string: "B004")
+    private let timeSyncCharUUID = CBUUID(string: "B005")  // Time synchronization
     
     private let ringBufferCapacity: UInt8 = 32
     private let resetOpcode: UInt8 = 0xFF
@@ -55,6 +56,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private var pairingStateChar: CBCharacteristic?
     private var pairingControlChar: CBCharacteristic?
     private var securityChallengeChar: CBCharacteristic?
+    private var timeSyncChar: CBCharacteristic?
     private var pendingChallenge: SecurityChallenge?
     
     // Internal
@@ -63,6 +65,8 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private var delta: UInt8 = 0
     private var lastConnectAttempt = Date.distantPast
     private var pendingReset = false
+    private var pendingTimeSync = false  // Whether to sync time after connection
+    private var lastTimeSyncDate = Date.distantPast  // Track last successful time sync
     
     override init() {
         super.init()
@@ -93,23 +97,26 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     
     func start() {
         guard central.state == .poweredOn else {
-            log("Bluetooth not powered on")
+            log("⚠️ Bluetooth not powered on (state: \(central.state.rawValue))")
             return
         }
         
         // Check if device is paired
         guard isPairedToDevice else {
-            log("No paired device. Please scan QR code first.")
+            log("⚠️ No paired device. Please scan QR code first.")
             status = .idle
             return
         }
         
-        if isScanning { return }
+        if isScanning { 
+            log("Already scanning, ignoring start() call")
+            return
+        }
         isScanning = true
         status = .scanning
         central.scanForPeripherals(withServices: nil,
                                    options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
-        log("Scanning for \(pairedDeviceName ?? "unknown device")...")
+        log("✅ Started scanning for \(pairedDeviceName ?? "unknown device")...")
     }
     
     func stop() {
@@ -126,31 +133,81 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     }
     
     private func handleAdv(peripheral: CBPeripheral, data: Data) {
-        guard data.count == 1 else { return }
+        guard data.count == 1 else { 
+            log("⚠️ Invalid adv data size: \(data.count)")
+            return 
+        }
         let b = data[0]
         let seq = (b >> 1) & 0x7F
         let st = b & 0x01
         
         let d = modularDelta(old: lastKnownSequence, new: seq)
-        guard d != 0 else { return }
+        
+        log("🔍 handleAdv: seq=\(seq) state=\(st) lastKnown=\(lastKnownSequence) delta=\(d)")
+        
+        // Check for initial state (device just booted/reset)
+        let isInitialState = (seq == 0 && st == 0)
+        
+        // CRITICAL: If device is in initial state (seq=0 state=0), connect and sync time
+        // DEVICE RESET DETECTION: If lastKnown > 0 and we see seq=0, device definitely reset!
+        let isDeviceReset = (lastKnownSequence > 0 && seq == 0)
+        
+        if isInitialState {
+            // If device reset (was seq>0, now seq=0), ALWAYS reconnect regardless of time
+            if isDeviceReset {
+                log("🔄 DEVICE RESET DETECTED! (lastKnown=\(lastKnownSequence) -> seq=0) Forcing reconnect...")
+                advSeq = seq; advState = st; delta = d
+                connect(reset: true, peripheral: peripheral, syncTime: true)
+                return
+            }
+            
+            // Otherwise check 5-minute rule (first boot or app restart)
+            let timeSinceLastSync = Date().timeIntervalSince(lastTimeSyncDate)
+            if timeSinceLastSync < 300 {  // 5 minutes
+                log("⏰ Initial state but time synced \(Int(timeSinceLastSync))s ago, skipping reconnect")
+                return
+            }
+            
+            log("Initial state detected (seq=0 state=0) -> connect & sync time")
+            advSeq = seq; advState = st; delta = d
+            connect(reset: false, peripheral: peripheral, syncTime: true)
+            return
+        }
+        
+        // Check if state changed even if delta is 0 (device at same sequence but different state)
+        if d == 0 {
+            if st != currentStableState {
+                log("🔄 State changed from \(currentStableState) to \(st) at same sequence \(seq) - applying update!")
+                advSeq = seq; advState = st; delta = d
+                applySimple(seq: seq, state: st)
+                return
+            }
+            log("⚠️ Delta is 0 and state unchanged (seq=\(seq), state=\(st), lastKnownState=\(currentStableState)), skipping")
+            return
+        }
         
         advSeq = seq; advState = st; delta = d
         log("ADV seq=\(seq) state=\(st) delta=\(d)")
         
+        // Apply locally if delta=1 (no connection needed)
         if d == 1 && !alwaysConnectOnChange {
             applySimple(seq: seq, state: st)
             return
         }
-        if d <= ringBufferCapacity {
-            connect(reset: false, peripheral: peripheral)
-        } else {
+        
+        // Connect for delta > 1
+        if d > 1 && d <= ringBufferCapacity {
+            connect(reset: false, peripheral: peripheral, syncTime: true)
+        } else if d > ringBufferCapacity {
             log("Large gap \(d) > \(ringBufferCapacity) -> reset")
-            connect(reset: true, peripheral: peripheral)
+            connect(reset: true, peripheral: peripheral, syncTime: true)
         }
     }
     
     private func applySimple(seq: UInt8, state: UInt8) {
         let previousState = currentStableState
+        
+        log("📝 applySimple: seq=\(seq), state=\(state), previousState=\(previousState)")
         
         lastKnownSequence = seq
         currentStableState = state
@@ -161,6 +218,9 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
                                epoch: nil)
         log("Applied simple delta=1 update locally")
         status = .upToDate
+        
+        // Always persist for timeline tracking (even if state unchanged)
+        persistTransition(seq: seq, st: state, note: previousState != state ? "state-change" : "sequence-update")
         
         // Send notification on stress state change
         if previousState != state {
@@ -177,7 +237,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     }
     
     // MARK: Connection Flow
-    private func connect(reset: Bool, peripheral: CBPeripheral) {
+    private func connect(reset: Bool, peripheral: CBPeripheral, syncTime: Bool = false) {
         // Don't connect if already connected or connecting
         if self.peripheral != nil && (status == .connecting || status == .requestingMissed) {
             log("Already connected/connecting, ignoring")
@@ -190,11 +250,12 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
         }
         lastConnectAttempt = Date()
         pendingReset = reset
+        pendingTimeSync = syncTime  // Store for after connection
         self.peripheral = peripheral
         peripheral.delegate = self
         status = .connecting
         central.connect(peripheral, options: nil)
-        log("Connecting reset=\(reset) delta=\(delta)")
+        log("Connecting reset=\(reset) syncTime=\(syncTime) delta=\(delta)")
     }
     
     private func sendReset() {
@@ -205,6 +266,39 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
         p.writeValue(d, for: char, type: .withResponse)
         p.readValue(for: char)
         log("Sent RESET opcode")
+    }
+    
+    private func syncTimeWithDevice() {
+        guard let char = timeSyncChar, let p = peripheral else {
+            log("⚠️ Time sync failed: characteristic or peripheral not available")
+            pendingTimeSync = false
+            return
+        }
+        
+        // Get current Unix timestamp in milliseconds
+        let now = Date()
+        let unixTimestampMs = UInt64(now.timeIntervalSince1970 * 1000)
+        
+        // Get timezone offset in seconds
+        let timezoneOffset = Int32(TimeZone.current.secondsFromGMT())
+        
+        // Build 12-byte payload:
+        // Bytes 0-7: Unix timestamp (uint64_t, little-endian)
+        // Bytes 8-11: Timezone offset (int32_t, little-endian)
+        var data = Data(count: 12)
+        withUnsafeBytes(of: unixTimestampMs.littleEndian) { data.replaceSubrange(0..<8, with: $0) }
+        withUnsafeBytes(of: timezoneOffset.littleEndian) { data.replaceSubrange(8..<12, with: $0) }
+        
+        p.writeValue(data, for: char, type: .withResponse)
+        
+        let timezoneHours = Double(timezoneOffset) / 3600.0
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        log("⏰ Syncing time: \(dateFormatter.string(from: now)) (UTC\(timezoneHours >= 0 ? "+" : "")\(String(format: "%.1f", timezoneHours)))")
+        log("   Unix: \(unixTimestampMs) ms, TZ offset: \(timezoneOffset) sec")
+        
+        // Don't clear pendingTimeSync here - wait for write callback
+        // It will be cleared in didWriteValueFor when write completes
     }
     
     private func requestMissed() {
@@ -257,6 +351,10 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private func parseMinimal(_ data: Data) {
         guard data.count == 2 else { return }
         let seq = data[0]; let st = data[1] & 0x01
+        
+        log("📦 RAW MINIMAL DATA: [\(data.map { String(format: "%02X", $0) }.joined(separator: " "))]")
+        log("📊 PARSED: seq=\(seq), state=\(st) (byte[1]=0x\(String(format: "%02X", data[1])))")
+        
         persistTransition(seq: seq, st: st, note: "minimal")
         lastKnownSequence = seq
         currentStableState = st
@@ -267,7 +365,13 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
                                epoch: nil)
         log("Minimal resp seq=\(seq) state=\(st)")
         status = .upToDate
-        disconnect()
+        
+        // Don't disconnect if time sync is pending - wait for write to complete
+        if !pendingTimeSync {
+            disconnect()
+        } else {
+            log("⏰ Keeping connection open for time sync...")
+        }
     }
     
     private func parseExtended(_ data: Data) {
@@ -327,6 +431,9 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
                                    reset: Int32? = nil,
                                    note: String?) {
         let rc = reset ?? repo.currentResetCounter(deviceUUID: deviceUUID)
+        
+        log("💾 PERSISTING: seq=\(seq), state=\(st), reset=\(rc), note=\(note ?? "none")")
+        
         let evt = StressTransitionDomainEvent(
             deviceID: deviceUUID,
             sequence7: seq,
@@ -345,6 +452,8 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
             isSynthetic: false
         )
         repo.persistTransition(evt)
+        
+        log("✅ PERSISTED to CoreData: seq=\(seq), state=\(st)")
     }
     
     // MARK: Logging
@@ -458,7 +567,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private func readCharacteristic(_ characteristic: CBCharacteristic, 
                                    from peripheral: CBPeripheral) async throws -> Data {
         return try await withCheckedThrowingContinuation { continuation in
-            let observer = UnsafeMutablePointer<NSObjectProtocol?>.allocate(capacity: 1)
+            nonisolated(unsafe) let observer = UnsafeMutablePointer<NSObjectProtocol?>.allocate(capacity: 1)
             observer.initialize(to: nil)
             
             observer.pointee = NotificationCenter.default.addObserver(
@@ -500,7 +609,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
                                     value: Data,
                                     to peripheral: CBPeripheral) async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            let observer = UnsafeMutablePointer<NSObjectProtocol?>.allocate(capacity: 1)
+            nonisolated(unsafe) let observer = UnsafeMutablePointer<NSObjectProtocol?>.allocate(capacity: 1)
             observer.initialize(to: nil)
             
             observer.pointee = NotificationCenter.default.addObserver(
@@ -562,14 +671,38 @@ extension LightShadowBLEManager: CBCentralManagerDelegate {
             
             // If no paired device, ignore all advertisements
             guard let pairedDeviceName = pairedDevice else {
+                // DEBUG: Log when no paired device
+                if peripheral.name?.hasPrefix("Shadow-") == true {
+                    log("🔍 Discovered \(peripheral.name ?? "unknown") but NO paired device in UserDefaults")
+                }
                 return
+            }
+            
+            // DEBUG: Log all Shadow device discoveries
+            if peripheral.name?.hasPrefix("Shadow-") == true {
+                log("🔍 Discovered: \(peripheral.name ?? "unknown"), paired: \(pairedDeviceName), match: \(peripheral.name == pairedDeviceName)")
             }
             
             // Only process advertisements from our paired device
             guard peripheral.name == pairedDeviceName else { return }
         
-            guard let sd = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data],
-                  let d = sd[serviceUUID] else { return }
+            // Check for service data
+            let hasServiceData = advertisementData[CBAdvertisementDataServiceDataKey] != nil
+            log("📡 Service data present: \(hasServiceData)")
+            
+            guard let sd = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] else {
+                log("⚠️ No service data dictionary in advertisement")
+                return
+            }
+            
+            log("📡 Service UUIDs in advertisement: \(sd.keys.map { $0.uuidString })")
+            
+            guard let d = sd[serviceUUID] else {
+                log("⚠️ Service UUID \(serviceUUID.uuidString) not found in advertisement")
+                return
+            }
+            
+            log("✅ Calling handleAdv with \(d.count) bytes")
             handleAdv(peripheral: peripheral, data: d)
         }
     }
@@ -622,12 +755,13 @@ extension LightShadowBLEManager: CBPeripheralDelegate {
                 if $0.uuid == serviceUUID {
                     peripheral.discoverCharacteristics([eventCharUUID], for: $0)
                 } else if $0.uuid == pairingServiceUUID {
-                    // Discover all pairing characteristics
+                    // Discover all pairing characteristics including time sync
                     peripheral.discoverCharacteristics([
                         deviceInfoCharUUID,
                         pairingStateCharUUID,
                         pairingControlCharUUID,
-                        securityChallengeCharUUID
+                        securityChallengeCharUUID,
+                        timeSyncCharUUID
                     ], for: $0)
                 }
             }
@@ -669,6 +803,15 @@ extension LightShadowBLEManager: CBPeripheralDelegate {
                     securityChallengeChar = $0
                     log("🔐 Found Security Challenge characteristic")
                 }
+                else if $0.uuid == timeSyncCharUUID {
+                    timeSyncChar = $0
+                    log("⏰ Found Time Sync characteristic")
+                }
+            }
+            
+            // Sync time if requested AND pairing service is discovered AND time sync char available
+            if service.uuid == pairingServiceUUID && pendingTimeSync && timeSyncChar != nil {
+                syncTimeWithDevice()
             }
             
             // Original stress service logic - only proceed if stress service is discovered
@@ -706,6 +849,15 @@ extension LightShadowBLEManager: CBPeripheralDelegate {
                 )
             } else {
                 log("Write OK")
+                
+                // If this was a time sync write, mark success and disconnect
+                if characteristic.uuid == timeSyncCharUUID {
+                    pendingTimeSync = false  // Clear pending flag
+                    lastTimeSyncDate = Date()  // Track successful sync
+                    log("⏰ Time sync write complete, disconnecting...")
+                    disconnect()
+                }
+                
                 // Post notification for async write success
                 NotificationCenter.default.post(
                     name: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),

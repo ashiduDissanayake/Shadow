@@ -38,6 +38,7 @@ extern "C" {
 #define PAIRING_STATE_CHAR_UUID     0xB002
 #define PAIRING_CONTROL_CHAR_UUID   0xB003
 #define SECURITY_CHALLENGE_CHAR_UUID 0xB004
+#define TIME_SYNC_CHAR_UUID         0xB005  // Time synchronization
 
 #define MAX_PAIRED_DEVICES          3
 #define DEVICE_NAME_MAX_LEN         32
@@ -147,6 +148,7 @@ typedef struct {
     uint16_t pairing_state_handle;
     uint16_t pairing_control_handle;
     uint16_t security_challenge_handle;
+    uint16_t time_sync_handle;      // Time synchronization characteristic
     uint16_t conn_id;
     bool initialized;
     bool notifications_enabled;

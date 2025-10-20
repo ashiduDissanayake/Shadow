@@ -49,14 +49,17 @@
 #include "event_log.h"
 #include "ble_stress_service.h"
 #include "ble_pairing.h"            // BLE device pairing protocol
+#include "time_sync.h"              // Time synchronization system
 #include "display_manager.h"        // TFT display and QR code
 
 // ==================== PIN CONFIGURATION ====================
 #define I2C_SDA_PIN         44    // T-Display S3 SDA pin
 #define I2C_SCL_PIN         43    // T-Display S3 SCL pin
 #define BUTTON_LEFT_PIN     0     // T-Display S3 left button (GPIO 0) - Calibration control
-#define BUTTON_RIGHT_PIN    14    // T-Display S3 right button (GPIO 14) - Display toggle
+#define BUTTON_RIGHT_PIN    14    // T-Display S3 right button (GPIO 14) - Display control
 #define BUTTON_DEBOUNCE_MS  200   // Button debounce time
+#define BUTTON_LONG_PRESS_MS 1500 // Long press threshold for QR toggle
+#define DISPLAY_AUTO_SLEEP_MS 30000 // Auto sleep after 30 seconds
 #define MAX_INT_PIN         1     // MAX30105 interrupt pin
 #define MPU_INT_PIN         2     // MPU6050 interrupt pin
 #define GSR_ADC_PIN         3     // GSR ADC pin (same as MAX_INT for now)
@@ -122,6 +125,7 @@ static adc_cali_handle_t adc_cali_handle = NULL;
 static gptimer_handle_t gsr_timer = NULL;
 static gptimer_handle_t max_poll_timer = NULL;  // RE-ENABLED - interrupt approach unreliable
 static gptimer_handle_t temp_timer = NULL;       // Timer for temperature sampling
+static gptimer_handle_t display_refresh_timer = NULL;  // Timer for display refresh and auto-sleep
 static QueueHandle_t sensor_event_queue;
 
 /* Feature extraction workspace */
@@ -143,6 +147,8 @@ static display_device_info_t g_device_info = {
 };
 static volatile int64_t last_button_left_press = 0;
 static volatile int64_t last_button_right_press = 0;
+static volatile int64_t button_right_press_start = 0;  // Track button press start time
+static volatile int64_t last_display_activity = 0;     // Track last display activity for auto-sleep
 static bool adc_calibrated = false;
 static bool recalibration_confirm_pending = false;  // Track if waiting for confirmation
 
@@ -171,7 +177,9 @@ typedef enum {
     SENSOR_EVENT_MAX_POLL,  // Re-enabled for polling-based sampling
     SENSOR_EVENT_BUTTON_PRESS,  // Button press to toggle display
     SENSOR_EVENT_BUTTON_LEFT,   // Left button (calibration control)
-    SENSOR_EVENT_BUTTON_RIGHT,  // Right button (display toggle)
+    SENSOR_EVENT_BUTTON_RIGHT,  // Right button (display control)
+    SENSOR_EVENT_BUTTON_RIGHT_RELEASE,  // Right button release (for long-press detection)
+    SENSOR_EVENT_DISPLAY_REFRESH,  // Periodic display refresh
 } sensor_event_type_t;
 
 typedef struct {
@@ -193,6 +201,7 @@ static bool i2c_write_byte(uint8_t device_addr, uint8_t reg_addr, uint8_t data);
 static bool gsr_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);
 // static bool max_poll_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);  // DISABLED
 static bool temp_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);     // Temperature sampling
+static bool display_refresh_timer_callback(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *);  // Display refresh
 static void max_interrupt_handler(void *arg);
 static void mpu_interrupt_handler(void *arg);
 void producer_task(void *param);
@@ -265,28 +274,46 @@ static void IRAM_ATTR button_left_interrupt_handler(void *arg) {
 }
 
 /**
- * Right button interrupt handler - Display toggle
- * Debounced in ISR to avoid multiple triggers
+ * Right button interrupt handler - Display control
+ * Detects both press and release for long-press detection
  */
 static void IRAM_ATTR button_right_interrupt_handler(void *arg) {
     int64_t now = esp_timer_get_time() / 1000;  // Convert to ms
+    int level = gpio_get_level(BUTTON_RIGHT_PIN);
     
-    // Debounce
-    if (now - last_button_right_press < BUTTON_DEBOUNCE_MS) {
-        return;
-    }
-    
-    last_button_right_press = now;
-    
-    sensor_event_t event = {
-        .type = SENSOR_EVENT_BUTTON_RIGHT,
-        .timestamp_us = esp_timer_get_time(),
-        .sequence = 0
-    };
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
-    if (xHigherPriorityTaskWoken) {
-        portYIELD_FROM_ISR();
+    if (level == 0) {
+        // Button pressed (active low)
+        if (now - last_button_right_press < BUTTON_DEBOUNCE_MS) {
+            return;  // Debounce
+        }
+        last_button_right_press = now;
+        button_right_press_start = now;  // Record press start time
+        
+        sensor_event_t event = {
+            .type = SENSOR_EVENT_BUTTON_RIGHT,
+            .timestamp_us = esp_timer_get_time(),
+            .sequence = 0
+        };
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
+        if (xHigherPriorityTaskWoken) {
+            portYIELD_FROM_ISR();
+        }
+    } else {
+        // Button released
+        if (button_right_press_start > 0) {
+            sensor_event_t event = {
+                .type = SENSOR_EVENT_BUTTON_RIGHT_RELEASE,
+                .timestamp_us = esp_timer_get_time(),
+                .sequence = (uint32_t)(now - button_right_press_start)  // Store press duration
+            };
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
+            button_right_press_start = 0;
+            if (xHigherPriorityTaskWoken) {
+                portYIELD_FROM_ISR();
+            }
+        }
     }
 }
 
@@ -322,6 +349,18 @@ static bool IRAM_ATTR temp_timer_callback(gptimer_handle_t timer, const gptimer_
         .type = SENSOR_EVENT_TEMP_TIMER,
         .timestamp_us = esp_timer_get_time(),
         .sequence = ++temp_sequence
+    };
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
+    return (xHigherPriorityTaskWoken == pdTRUE);
+}
+
+/* Display refresh timer - updates clock and handles auto-sleep */
+static bool IRAM_ATTR display_refresh_timer_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx) {
+    sensor_event_t event = {
+        .type = SENSOR_EVENT_DISPLAY_REFRESH,
+        .timestamp_us = esp_timer_get_time(),
+        .sequence = 0
     };
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
@@ -1052,6 +1091,61 @@ static bool temp_timer_init(void) {
     return true;
 }
 
+/* ================= DISPLAY REFRESH TIMER SETUP ================= */
+static bool setup_display_refresh_timer(void) {
+    ESP_LOGI(TAG, "Setting up display refresh timer (1Hz for clock updates + auto-sleep check)");
+    
+    gptimer_config_t timer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1000000,  // 1MHz (1us resolution)
+    };
+    
+    esp_err_t err = gptimer_new_timer(&timer_config, &display_refresh_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Display refresh timer creation failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    gptimer_event_callbacks_t cbs = {
+        .on_alarm = display_refresh_timer_callback,
+    };
+    
+    err = gptimer_register_event_callbacks(display_refresh_timer, &cbs, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Display refresh callback registration failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    // 1Hz refresh (1 second = 1,000,000 microseconds)
+    gptimer_alarm_config_t alarm_config = {
+        .alarm_count = 1000000,  // 1 second
+        .reload_count = 0,
+        .flags.auto_reload_on_alarm = true,
+    };
+    
+    err = gptimer_set_alarm_action(display_refresh_timer, &alarm_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Display refresh alarm config failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    err = gptimer_enable(display_refresh_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Display refresh timer enable failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    err = gptimer_start(display_refresh_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Display refresh timer start failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    
+    ESP_LOGI(TAG, "Display refresh timer started at 1Hz");
+    return true;
+}
+
 /* ================= ENHANCED SENSOR PROCESSING WITH ML INTEGRATION ================= */
 static void enhanced_sensor_processing_task(void *pvParameters) {
     ESP_LOGI(TAG_DATA, "Enhanced Shadow sensor processing with ML integration started");
@@ -1204,15 +1298,56 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                     break;
                 
                 case SENSOR_EVENT_BUTTON_RIGHT:
-                    // Right button: Toggle display mode (clock <-> QR code)
-                    ESP_LOGI(TAG_MAIN, "🔘 Right button pressed - toggling display");
-                    display_toggle_mode(&g_device_info);
+                    // Right button pressed - just record activity, wait for release
+                    last_display_activity = esp_timer_get_time() / 1000;
+                    break;
+                
+                case SENSOR_EVENT_BUTTON_RIGHT_RELEASE: {
+                    // Right button released - check press duration
+                    uint32_t press_duration_ms = event.sequence;  // Duration stored in sequence field
+                    last_display_activity = esp_timer_get_time() / 1000;
+                    
+                    if (press_duration_ms >= BUTTON_LONG_PRESS_MS) {
+                        // Long press (≥1.5s) - Toggle QR code
+                        if (display_is_on()) {
+                            ESP_LOGI(TAG_MAIN, "🔘 Long press detected (%lu ms) - toggling QR code", press_duration_ms);
+                            display_toggle_mode(&g_device_info);
+                        } else {
+                            // If display was off, turn it on first
+                            ESP_LOGI(TAG_MAIN, "💡 Display waking from long press");
+                            display_set_power(true);
+                        }
+                    } else {
+                        // Short press (<1.5s) - Toggle display power
+                        if (display_is_on()) {
+                            ESP_LOGI(TAG_MAIN, "💤 Short press - display sleep");
+                            display_set_power(false);
+                        } else {
+                            ESP_LOGI(TAG_MAIN, "� Short press - display wake");
+                            display_set_power(true);
+                        }
+                    }
+                    break;
+                }
+                
+                case SENSOR_EVENT_DISPLAY_REFRESH:
+                    // Periodic display refresh (for clock updates) and auto-sleep check
+                    if (display_is_on()) {
+                        display_refresh();
+                        
+                        // Check auto-sleep timeout
+                        int64_t current_time_ms = esp_timer_get_time() / 1000;
+                        int64_t idle_time_ms = current_time_ms - last_display_activity;
+                        
+                        if (idle_time_ms >= DISPLAY_AUTO_SLEEP_MS) {
+                            ESP_LOGI(TAG_MAIN, "💤 Auto-sleep: Display idle for %lld ms, turning off", idle_time_ms);
+                            display_set_power(false);
+                        }
+                    }
                     break;
                 
                 case SENSOR_EVENT_BUTTON_PRESS:
-                    // Legacy button handler - map to right button behavior
-                    ESP_LOGI(TAG_MAIN, "🔘 Button pressed - toggling display");
-                    display_toggle_mode(&g_device_info);
+                    // Legacy button handler - removed
                     break;
                 
                 /* REMOVED: SENSOR_EVENT_MAX_POLL - MAX30105 uses interrupts only */
@@ -1289,17 +1424,17 @@ static esp_err_t setup_gpio_interrupts(void) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(BUTTON_LEFT_PIN, button_left_interrupt_handler, NULL));
     ESP_LOGI(TAG_MAIN, "✅ Left button (GPIO %d) configured for calibration control", BUTTON_LEFT_PIN);
     
-    // Right button (GPIO 14) - Display toggle
+    // Right button (GPIO 14) - Display control (both press and release)
     gpio_config_t btn_right_conf = {
         .pin_bit_mask = (1ULL << BUTTON_RIGHT_PIN),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_NEGEDGE
+        .intr_type = GPIO_INTR_ANYEDGE  // Trigger on both falling and rising edge
     };
     ESP_ERROR_CHECK(gpio_config(&btn_right_conf));
     ESP_ERROR_CHECK(gpio_isr_handler_add(BUTTON_RIGHT_PIN, button_right_interrupt_handler, NULL));
-    ESP_LOGI(TAG_MAIN, "✅ Right button (GPIO %d) configured for display toggle", BUTTON_RIGHT_PIN);
+    ESP_LOGI(TAG_MAIN, "✅ Right button (GPIO %d) configured for display control (long-press support)", BUTTON_RIGHT_PIN);
     
     return ESP_OK;
 }
@@ -1408,8 +1543,17 @@ void consumer_task(void *param) {
             ESP_LOGI(TAG, "   Total Pipeline: %lu ms", total_time);
             ESP_LOGI(TAG, "   Batch Index: %lu", min_batches);
 
+            // Get timestamp - use synchronized time if available, otherwise boot time
+            uint32_t now_ms;
+            if (time_sync_is_synced()) {
+                // Use real-world Unix timestamp (milliseconds)
+                now_ms = (uint32_t)time_sync_get_timestamp_ms();
+            } else {
+                // Fallback to boot time (microseconds -> milliseconds)
+                now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+            }
+            
             // Update FSM with CNN probability (for backward compatibility with BLE service)
-            uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
             bool transition = stress_fsm_process_inference(&g_stress_fsm, stress_prob, now_ms, on_stress_transition);
             
             // Update BLE advertisement
@@ -1620,6 +1764,13 @@ void app_main(void) {
         return;
     }
     
+    // Initialize time synchronization system
+    ESP_LOGI(TAG, "⏰ Initializing time synchronization...");
+    if (time_sync_init() != 0) {
+        ESP_LOGE(TAG, "❌ Failed to initialize time sync");
+        // Continue without time sync - will use boot time
+    }
+    
     // Initialize BLE stress service
     if (ble_stress_service_init(&g_stress_fsm, &g_event_log) != 0) {
         ESP_LOGE(TAG, "Failed ble_stress_service_init()");
@@ -1734,6 +1885,14 @@ void app_main(void) {
     if (!temp_timer_init()) {
         ESP_LOGE(TAG, "⚠️  Temperature timer setup failed, temperature data will not be available");
     }
+    
+    // Setup display refresh timer (for clock updates and auto-sleep)
+    if (!setup_display_refresh_timer()) {
+        ESP_LOGW(TAG, "⚠️  Display refresh timer setup failed, clock won't auto-update");
+    }
+    
+    // Initialize display activity timestamp (display starts on)
+    last_display_activity = esp_timer_get_time() / 1000;
     
     ESP_LOGI(TAG_MAIN, "✅ Hardware initialization complete");
     vTaskDelay(pdMS_TO_TICKS(2000));

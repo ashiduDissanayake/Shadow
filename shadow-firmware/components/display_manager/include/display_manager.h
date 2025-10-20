@@ -61,8 +61,17 @@ extern "C" {
 typedef enum {
     DISPLAY_MODE_CLOCK,      // Show clock
     DISPLAY_MODE_QR,         // Show QR code
-    DISPLAY_MODE_STATUS      // Show status message
+    DISPLAY_MODE_STATUS,     // Show status message
+    DISPLAY_MODE_OFF         // Screen off (power saving)
 } display_mode_t;
+
+/**
+ * Display power state
+ */
+typedef enum {
+    DISPLAY_POWER_ON,        // Display is on
+    DISPLAY_POWER_OFF        // Display is off (backlight off)
+} display_power_state_t;
 
 /**
  * Device information for QR code display
@@ -105,6 +114,36 @@ esp_err_t display_show_clock(void);
  * @return ESP_OK on success
  */
 esp_err_t display_toggle_mode(const display_device_info_t *info);
+
+/**
+ * Turn display power on or off (backlight control)
+ * 
+ * @param on true to turn on, false to turn off
+ * @return ESP_OK on success
+ */
+esp_err_t display_set_power(bool on);
+
+/**
+ * Get current display power state
+ * 
+ * @return true if display is on, false if off
+ */
+bool display_is_on(void);
+
+/**
+ * Refresh the current display mode (update clock time, etc.)
+ * Should be called periodically when display is on
+ * 
+ * @return ESP_OK on success
+ */
+esp_err_t display_refresh(void);
+
+/**
+ * Get current display mode
+ * 
+ * @return Current display mode
+ */
+display_mode_t display_get_mode(void);
 
 /**
  * DIRECT GPIO TEST - Uses TFT_eSPI approach (no esp_lcd)

@@ -8,6 +8,7 @@ final class SyncDashboardViewModel: ObservableObject {
     @Published var sequenceStatus: String = "-"
     @Published var log: [String] = []
     @Published var eventsReceived: Int = 0
+    @Published var eventUpdateTrigger: UUID = UUID()  // Force UI updates
     @Published var isActive: Bool = false
     @Published var currentStateLabel: String = "CALM"
     
@@ -68,6 +69,43 @@ final class SyncDashboardViewModel: ObservableObject {
         manager.$lastKnownSequence
             .map { Int($0) }
             .assign(to: &$eventsReceived)
+
+        // Listen for persisted events and evaluate notifications
+        NotificationCenter.default.publisher(for: Notification.Name("Shadow.NewStressEvent"))
+            .receive(on: DispatchQueue.main)
+            .sink { note in
+                print("🔔 [ViewModel] Received Shadow.NewStressEvent notification!")
+                guard let userInfo = note.userInfo,
+                      let seq = userInfo["sequence"] as? Int,
+                      let state = userInfo["state"] as? Int,
+                      let idStr = userInfo["deviceID"] as? String,
+                      let deviceUUID = UUID(uuidString: idStr) else { 
+                    print("❌ [ViewModel] Failed to parse notification userInfo")
+                    return
+                }
+
+                print("🔔 [ViewModel] Parsed: seq=\(seq), state=\(state), device=\(deviceUUID)")
+                
+                // Fetch the persisted StressEvent from CoreData by sequence
+                let events = StressDataRepository.shared.recentEvents(deviceUUID: deviceUUID, limit: 200)
+                print("🔔 [ViewModel] Fetched \(events.count) recent events from CoreData")
+                
+                if let evt = events.first(where: { Int($0.sequenceNumber) == seq }) {
+                    print("🔔 [ViewModel] Found matching event: seq=\(evt.sequenceNumber), state=\(evt.stressState)")
+                    
+                    // Force UI update by changing trigger UUID
+                    Task { @MainActor in
+                        self.eventUpdateTrigger = UUID()
+                        print("🔄 [ViewModel] Triggered UI update with new UUID")
+                        
+                        // Evaluate via NotificationDecisionEngine (only once per event)
+                        NotificationDecisionEngine.shared.evaluate(event: evt)
+                    }
+                } else {
+                    print("❌ [ViewModel] Could not find event with seq=\(seq) in CoreData")
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - UI Actions
@@ -83,7 +121,16 @@ final class SyncDashboardViewModel: ObservableObject {
     
     // MARK: - Data Access
     func getRecentEvents(limit: Int = 50) -> [StressEvent] {
-        StressDataRepository.shared.recentEvents(limit: limit)
+        let events = StressDataRepository.shared.recentEvents(limit: limit)
+        print("🔍 [ViewModel] getRecentEvents() fetched \(events.count) events from CoreData")
+        return events
+    }
+    
+    /// Get events from last N hours (for graph display)
+    func getEventsInLastHours(_ hours: Int = 3) -> [StressEvent] {
+        let events = StressDataRepository.shared.eventsInLastHours(hours)
+        print("🔍 [ViewModel] getEventsInLastHours(\(hours)) fetched \(events.count) events")
+        return events
     }
     
     var recentEvents: [StressEvent] {

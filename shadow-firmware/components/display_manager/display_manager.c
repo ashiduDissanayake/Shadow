@@ -4,6 +4,7 @@
  */
 
 #include "display_manager.h"
+#include "time_sync.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "esp_lcd_panel_io.h"
@@ -24,6 +25,7 @@ static esp_lcd_panel_io_handle_t io_handle = NULL;
 static uint16_t *frame_buffer = NULL;
 static display_mode_t current_mode = DISPLAY_MODE_CLOCK;
 static display_device_info_t saved_device_info = {0};
+static bool display_power_on = true;  // Display starts on
 
 // Helper: Clear screen with color
 static void clear_screen(uint16_t color) {
@@ -197,11 +199,31 @@ esp_err_t display_show_clock(void) {
         return ESP_FAIL;
     }
     
-    // Get current time
-    time_t now;
+    // Get current time from time_sync if available
     struct tm timeinfo;
-    time(&now);
-    localtime_r(&now, &timeinfo);
+    int ret = time_sync_get_local_time(&timeinfo);
+    
+    if (ret != 0) {
+        // Time not synced yet - show placeholder
+        clear_screen(0x001F);  // Dark blue background
+        
+        // Display "SYNCING..." message
+        int x_start = 60;
+        int y_start = 70;
+        
+        // We don't have text rendering, so just show --:--
+        draw_large_digit(x_start, y_start, 10, COLOR_GRAY);  // Dash (assuming 10 draws dash)
+        draw_large_digit(x_start + 40, y_start, 10, COLOR_GRAY);
+        draw_rect(x_start + 80, y_start + 18, 6, 6, COLOR_GRAY);
+        draw_rect(x_start + 80, y_start + 35, 6, 6, COLOR_GRAY);
+        draw_large_digit(x_start + 90, y_start, 10, COLOR_GRAY);
+        draw_large_digit(x_start + 130, y_start, 10, COLOR_GRAY);
+        
+        ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_WIDTH, LCD_HEIGHT, frame_buffer));
+        ESP_LOGI(TAG, "Clock display: Waiting for time sync...");
+        current_mode = DISPLAY_MODE_CLOCK;
+        return ESP_OK;
+    }
     
     // Clear screen with dark blue
     clear_screen(0x001F);  // Dark blue background
@@ -294,11 +316,63 @@ esp_err_t display_show_qr_code(const display_device_info_t *info) {
 }
 
 esp_err_t display_toggle_mode(const display_device_info_t *info) {
+    if (!display_power_on) {
+        return ESP_OK;  // Don't toggle if display is off
+    }
+    
     if (current_mode == DISPLAY_MODE_CLOCK) {
         return display_show_qr_code(info ? info : &saved_device_info);
     } else {
         return display_show_clock();
     }
+}
+
+esp_err_t display_set_power(bool on) {
+    if (!panel_handle) {
+        return ESP_FAIL;
+    }
+    
+    display_power_on = on;
+    
+    if (on) {
+        // Turn on backlight
+        gpio_set_level(LCD_PIN_NUM_BK_LIGHT, 1);
+        ESP_LOGI(TAG, "Display powered ON");
+        
+        // Refresh current mode
+        if (current_mode == DISPLAY_MODE_CLOCK) {
+            display_show_clock();
+        } else if (current_mode == DISPLAY_MODE_QR) {
+            display_show_qr_code(&saved_device_info);
+        }
+    } else {
+        // Turn off backlight
+        gpio_set_level(LCD_PIN_NUM_BK_LIGHT, 0);
+        ESP_LOGI(TAG, "Display powered OFF");
+    }
+    
+    return ESP_OK;
+}
+
+bool display_is_on(void) {
+    return display_power_on;
+}
+
+esp_err_t display_refresh(void) {
+    if (!display_power_on || !panel_handle) {
+        return ESP_OK;  // Don't refresh if display is off
+    }
+    
+    // Refresh based on current mode
+    if (current_mode == DISPLAY_MODE_CLOCK) {
+        return display_show_clock();
+    }
+    // QR code doesn't need refresh
+    return ESP_OK;
+}
+
+display_mode_t display_get_mode(void) {
+    return current_mode;
 }
 
 esp_err_t display_show_status(const char *status_text) {

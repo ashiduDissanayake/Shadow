@@ -19,7 +19,7 @@
         <attribute name="lastKnownState" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="lastReplayDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="resetCounter" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-        <relationship name="stressEvents" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="StressEvent" inverseName="device" inverseEntity="StressEvent"/>
+        <relationship name="stressEvents" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="StressEvent" inverseName="device" inverseEntity="StressEvent"/>
         <relationship name="userProfile" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProfile" inverseName="shadowDevices" inverseEntity="UserProfile"/>
     </entity>
     <entity name="StressEvent" representedClassName="StressEvent" syncable="YES" codeGenerationType="class">

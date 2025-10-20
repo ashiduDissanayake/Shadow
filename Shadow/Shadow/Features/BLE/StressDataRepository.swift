@@ -112,9 +112,12 @@ final class StressDataRepository {
     
     func persistTransition(_ evt: StressTransitionDomainEvent) {
         let device = getOrCreateDevice(deviceUUID: evt.deviceID)
+        // Check if exact same event already exists (sequence + state + resetCounter)
         if exists(sequence: evt.sequence7,
+                  state: Int16(evt.stressState),
                   resetCounter: evt.resetCounter,
                   device: device) {
+            print("⚠️ [Repository] Duplicate event (seq=\(evt.sequence7), state=\(evt.stressState), reset=\(evt.resetCounter)), skipping")
             return
         }
         let e = StressEvent(context: context)
@@ -133,6 +136,16 @@ final class StressDataRepository {
 //        if let q = evt.sensorQuality { e.sensorQuality = Int16(q) }
 //        if let dPrev = evt.durationPrevMs { e.durationPrevState = Int32(dPrev) }
         save()
+        
+        print("✅ [Repository] Saved event: seq=\(evt.sequence7), state=\(evt.stressState), reset=\(evt.resetCounter)")
+        
+        // Notify observers about new event (lightweight payload)
+        NotificationCenter.default.post(name: Notification.Name("Shadow.NewStressEvent"), object: nil, userInfo: [
+            "deviceID": evt.deviceID.uuidString,
+            "sequence": Int(evt.sequence7),
+            "state": Int(evt.stressState),
+            "timestamp": evt.receivedAt
+        ])
     }
     
     func persistResetMarker(_ marker: ResetMarkerDomainEvent,
@@ -153,17 +166,18 @@ final class StressDataRepository {
     }
     
     private func exists(sequence: UInt8,
+                        state: Int16,
                         resetCounter: Int32,
                         device: ShadowDevice) -> Bool {
-        // If no resetCounter attribute, uniqueness becomes unreliable; skip check
+        // Check if exact same event exists (sequence + state + resetCounter)
         guard hasKey(device, key: "resetCounter") else { return false }
         let req: NSFetchRequest<StressEvent> = StressEvent.fetchRequest()
         if hasProperty(entity: StressEvent.entity(), name: "resetCounter") {
-            req.predicate = NSPredicate(format: "device == %@ AND sequenceNumber == %d AND resetCounter == %d",
-                                        device, Int(sequence), resetCounter)
+            req.predicate = NSPredicate(format: "device == %@ AND sequenceNumber == %d AND stressState == %d AND resetCounter == %d",
+                                        device, Int(sequence), Int(state), resetCounter)
         } else {
-            req.predicate = NSPredicate(format: "device == %@ AND sequenceNumber == %d",
-                                        device, Int(sequence))
+            req.predicate = NSPredicate(format: "device == %@ AND sequenceNumber == %d AND stressState == %d",
+                                        device, Int(sequence), Int(state))
         }
         req.fetchLimit = 1
         return ((try? context.fetch(req))?.isEmpty == false)
@@ -176,22 +190,58 @@ final class StressDataRepository {
         let req: NSFetchRequest<StressEvent> = StressEvent.fetchRequest()
         req.predicate = NSPredicate(format: "device.deviceIdentifier == %@", idStr)
         
-        if hasProperty(entity: StressEvent.entity(), name: "resetCounter") {
-            req.sortDescriptors = [
-                NSSortDescriptor(key: "resetCounter", ascending: true),
-                NSSortDescriptor(key: "sequenceNumber", ascending: true)
-            ]
-        } else {
-            req.sortDescriptors = [
-                NSSortDescriptor(key: "sequenceNumber", ascending: true)
-            ]
-        }
+        // Sort by timestamp (most recent first) instead of sequence
+        req.sortDescriptors = [NSSortDescriptor(keyPath: \StressEvent.timestamp, ascending: false)]
+        
         req.fetchLimit = limit
-        return (try? context.fetch(req)) ?? []
+        let events = (try? context.fetch(req)) ?? []
+        
+        print("🔍 [Repository] recentEvents(deviceUUID) fetched \(events.count) events")
+        return events
     }
     
     func recentEvents(limit: Int = 50) -> [StressEvent] {
-        recentEvents(deviceUUID: defaultDeviceUUID, limit: limit)
+        // Refresh context to get latest data
+        context.refreshAllObjects()
+        
+        let events = recentEvents(deviceUUID: defaultDeviceUUID, limit: limit)
+        print("📊 [Repository] recentEvents() returned \(events.count) events")
+        if events.count > 0 {
+            print("   First event: seq=\(events.first!.sequenceNumber), state=\(events.first!.stressState)")
+            print("   Last event: seq=\(events.last!.sequenceNumber), state=\(events.last!.stressState)")
+            
+            // DEBUG: Print ALL events
+            print("   ALL EVENTS (sorted by timestamp, newest first):")
+            for (index, event) in events.enumerated() {
+                let timeStr = event.timestamp?.description ?? "nil"
+                let resetStr = (event.value(forKey: "resetCounter") as? Int32).map { String($0) } ?? "?"
+                print("     [\(index)] seq=\(event.sequenceNumber), state=\(event.stressState), reset=\(resetStr), time=\(timeStr)")
+            }
+        }
+        return events
+    }
+    
+    /// Get events from last N hours (default 3 hours)
+    func eventsInLastHours(_ hours: Int = 3) -> [StressEvent] {
+        // Refresh context to get latest data
+        context.refreshAllObjects()
+        
+        let cutoff = Date().addingTimeInterval(-Double(hours) * 3600)
+        let idStr = defaultDeviceUUID.uuidString
+        let req: NSFetchRequest<StressEvent> = StressEvent.fetchRequest()
+        req.predicate = NSPredicate(format: "device.deviceIdentifier == %@ AND timestamp >= %@", idStr, cutoff as NSDate)
+        req.sortDescriptors = [NSSortDescriptor(keyPath: \StressEvent.timestamp, ascending: false)]
+        let events = (try? context.fetch(req)) ?? []
+        
+        print("📊 [Repository] eventsInLastHours(\(hours)) returned \(events.count) events since \(cutoff)")
+        
+        // DEBUG: Print each event
+        for (index, event) in events.enumerated() {
+            let timeStr = event.timestamp?.description ?? "nil"
+            print("   [\(index)] seq=\(event.sequenceNumber), state=\(event.stressState), time=\(timeStr)")
+        }
+        
+        return events
     }
     
     func deleteAll(deviceUUID: UUID) {
