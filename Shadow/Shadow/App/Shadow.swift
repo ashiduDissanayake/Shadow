@@ -53,7 +53,7 @@ struct Shadow: App {
     }
 }
 
-// App Delegate to set up notification delegate
+// App Delegate to set up notification delegate and calendar monitoring
 class AppDelegate: NSObject, NSApplicationDelegate {
     let notificationDelegate = NotificationDelegate()
     
@@ -61,5 +61,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("🚀 App launched, setting up notification delegate...")
         UNUserNotificationCenter.current().delegate = notificationDelegate
         print("✅ Notification delegate set")
+        
+        // Start calendar event monitoring
+        Task { @MainActor in
+            CalendarEventMonitor.shared.startMonitoring()
+            print("✅ Calendar event monitoring started")
+        }
     }
 }
