@@ -8,5 +8,7 @@
     <string>This app needs Bluetooth access to connect to ESP32.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>This app needs access to your calendar to display and schedule events.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Shadow needs camera access to scan QR codes from your Shadow device for pairing.</string>
 </dict>
 </plist>

@@ -40,8 +40,6 @@
 static pairing_context_t g_pairing_ctx = {0};
 
 /* Forward declarations */
-static void gatts_pairing_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
-                             esp_ble_gatts_cb_param_t *param);
 static int load_from_nvs(void);
 static int save_to_nvs(void);
 static int save_paired_device(uint8_t index);
@@ -90,12 +88,31 @@ int ble_pairing_init(const char *device_name) {
     snprintf(g_pairing_ctx.device_info.firmware_version, FIRMWARE_VERSION_LEN, "v1.0.0");
     snprintf(g_pairing_ctx.device_info.hardware_revision, HARDWARE_REVISION_LEN, "ESP32-S3");
 
-    /* Register GATT server callback */
-    esp_err_t ret = esp_ble_gatts_register_callback(gatts_pairing_cb);
+    /* Ensure GAP device name is set so scanners show the configured name */
+    if (strlen(g_pairing_ctx.device_info.device_name) > 0) {
+        esp_err_t rc = esp_ble_gap_set_device_name(g_pairing_ctx.device_info.device_name);
+        if (rc != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to set GAP device name: %d", rc);
+        } else {
+            ESP_LOGI(TAG, "GAP device name set: %s", g_pairing_ctx.device_info.device_name);
+        }
+    }
+
+    /* Set BLE GAP device name for advertising */
+    esp_err_t ret = esp_ble_gap_set_device_name(g_pairing_ctx.device_info.device_name);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "GATT callback register failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to set BLE device name: %s", esp_err_to_name(ret));
         return -1;
     }
+    ESP_LOGI(TAG, "BLE GAP device name set to: %s", g_pairing_ctx.device_info.device_name);
+
+    /* NOTE: Do NOT register GATT callback here - it would overwrite stress service callback!
+     * Instead, the stress service callback will forward pairing events based on gatts_if */
+    // ret = esp_ble_gatts_register_callback(gatts_pairing_cb);  // REMOVED
+    // if (ret != ESP_OK) {
+    //     ESP_LOGE(TAG, "GATT callback register failed: %s", esp_err_to_name(ret));
+    //     return -1;
+    // }
 
     ret = esp_ble_gatts_app_register(1); // App ID = 1 for pairing service
     if (ret != ESP_OK) {
@@ -572,8 +589,9 @@ static void on_security_challenge_write(esp_ble_gatts_cb_param_t *param) {
     ble_pairing_notify_state_change();
 }
 
-static void gatts_pairing_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
-                             esp_ble_gatts_cb_param_t *param) {
+/* Public GATT callback - called by stress service dispatcher */
+void ble_pairing_gatts_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+                                esp_ble_gatts_cb_param_t *param) {
     switch (event) {
         case ESP_GATTS_REG_EVT: {
             if (param->reg.status == ESP_GATT_OK && param->reg.app_id == 1) {
@@ -597,6 +615,10 @@ static void gatts_pairing_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         }
 
         case ESP_GATTS_CREATE_EVT: {
+            /* Only process events for our GATT interface (app_id=1) */
+            if (gatts_if != g_pairing_ctx.gatts_if && gatts_if != ESP_GATT_IF_NONE) {
+                break;
+            }
             if (param->create.status == ESP_GATT_OK) {
                 g_pairing_ctx.service_handle = param->create.service_handle;
                 ESP_LOGI(TAG, "Pairing service created (handle=%u)", g_pairing_ctx.service_handle);
@@ -616,6 +638,10 @@ static void gatts_pairing_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         }
 
         case ESP_GATTS_ADD_CHAR_EVT: {
+            /* Only process events for our GATT interface (app_id=1) */
+            if (gatts_if != g_pairing_ctx.gatts_if && gatts_if != ESP_GATT_IF_NONE) {
+                break;
+            }
             if (param->add_char.status == ESP_GATT_OK) {
                 ESP_LOGI(TAG, "Characteristic added (UUID=0x%04X, handle=%u)",
                          param->add_char.char_uuid.uuid.uuid16,
@@ -667,12 +693,20 @@ static void gatts_pairing_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         }
 
         case ESP_GATTS_CONNECT_EVT: {
+            /* Only process events for our GATT interface (app_id=1) */
+            if (gatts_if != g_pairing_ctx.gatts_if && gatts_if != ESP_GATT_IF_NONE) {
+                break;
+            }
             g_pairing_ctx.conn_id = param->connect.conn_id;
             ESP_LOGI(TAG, "Client connected (conn_id=%u)", g_pairing_ctx.conn_id);
             break;
         }
 
         case ESP_GATTS_DISCONNECT_EVT: {
+            /* Only process events for our GATT interface (app_id=1) */
+            if (gatts_if != g_pairing_ctx.gatts_if && gatts_if != ESP_GATT_IF_NONE) {
+                break;
+            }
             ESP_LOGI(TAG, "Client disconnected");
             /* Reset pairing state */
             g_pairing_ctx.state = PAIRING_STATE_ADVERTISING;
@@ -680,6 +714,10 @@ static void gatts_pairing_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         }
 
         case ESP_GATTS_READ_EVT: {
+            /* Only process events for our GATT interface (app_id=1) */
+            if (gatts_if != g_pairing_ctx.gatts_if && gatts_if != ESP_GATT_IF_NONE) {
+                break;
+            }
             if (param->read.handle == g_pairing_ctx.device_info_handle) {
                 on_device_info_read(param);
             } else if (param->read.handle == g_pairing_ctx.pairing_state_handle) {
@@ -691,6 +729,10 @@ static void gatts_pairing_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         }
 
         case ESP_GATTS_WRITE_EVT: {
+            /* Only process events for our GATT interface (app_id=1) */
+            if (gatts_if != g_pairing_ctx.gatts_if && gatts_if != ESP_GATT_IF_NONE) {
+                break;
+            }
             if (param->write.handle == g_pairing_ctx.pairing_control_handle) {
                 on_pairing_control_write(param);
             } else if (param->write.handle == g_pairing_ctx.security_challenge_handle) {

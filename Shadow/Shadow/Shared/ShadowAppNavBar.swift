@@ -28,33 +28,6 @@ struct ShadowAppNavBar: View {
             
             Spacer()
             
-            // BLE status indicator
-            Button(action: { showBLEPopover.toggle() }) {
-                HStack(spacing: 8) {
-                    bleStatusIcon
-                    
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text("Shadow BLE")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.9))
-                        
-                        Text(bleStatusText)
-                            .font(.caption2)
-                            .foregroundColor(bleStatusColor)
-                            .fontWeight(.medium)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(.ultraThinMaterial)
-                )
-            }
-            .popover(isPresented: $showBLEPopover) {
-                ShadowBLEPopoverView(syncViewModel: syncViewModel)
-            }
-            
             // Calendar button
             Button(action: onCalendarTap) {
                 Image(systemName: "calendar")

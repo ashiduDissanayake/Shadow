@@ -66,10 +66,11 @@ typedef enum {
 
 /**
  * Device information for QR code display
+ * Format: QR code contains only device name (e.g., "Shadow-9026")
  */
 typedef struct {
     const char *device_name;
-    const char *password;
+    const char *password;  // Deprecated - kept for backward compatibility, can be NULL
 } display_device_info_t;
 
 /**
@@ -81,9 +82,10 @@ esp_err_t display_init(void);
 
 /**
  * Show QR code with device information
- * Format: "device_name:password"
+ * Format: Just device name (e.g., "Shadow-9026")
+ * Password field is no longer used
  * 
- * @param info Device information
+ * @param info Device information (only device_name is used)
  * @return ESP_OK on success
  */
 esp_err_t display_show_qr_code(const display_device_info_t *info);

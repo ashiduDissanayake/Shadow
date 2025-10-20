@@ -244,7 +244,7 @@ esp_err_t display_show_qr_code(const display_device_info_t *info) {
         return ESP_FAIL;
     }
     
-    if (!info || !info->device_name || !info->password) {
+    if (!info || !info->device_name) {
         ESP_LOGE(TAG, "Invalid device info!");
         return ESP_ERR_INVALID_ARG;
     }
@@ -252,9 +252,9 @@ esp_err_t display_show_qr_code(const display_device_info_t *info) {
     // Save device info for toggle
     saved_device_info = *info;
     
-    // Create QR code data string: "SSID:device_name,PASS:password"
-    char qr_data[128];
-    snprintf(qr_data, sizeof(qr_data), "WIFI:T:WPA;S:%s;P:%s;;", info->device_name, info->password);
+    // Create QR code data string: Just device name (e.g., "Shadow-9026")
+    char qr_data[64];
+    snprintf(qr_data, sizeof(qr_data), "%s", info->device_name);
     
     // Clear screen with white background
     clear_screen(COLOR_WHITE);

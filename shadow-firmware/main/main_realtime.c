@@ -42,6 +42,7 @@
 #include "realtime_sensor_buffer.h"
 #include "signal_preprocessor.h"    // Signal preprocessing for CNN
 #include "cnn_inference.h"          // CNN inference engine (replaces MLP+FSM)
+#include "calibration.h"            // Calibration system for personalized baseline
 #include "feature_extractor.h"      // OLD: Keep for now, will remove later
 #include "simple_mlp.h"             // OLD: Keep for now, will remove later
 #include "stress_fsm.h"             // OLD: Keep for now, will remove later
@@ -53,10 +54,11 @@
 // ==================== PIN CONFIGURATION ====================
 #define I2C_SDA_PIN         44    // T-Display S3 SDA pin
 #define I2C_SCL_PIN         43    // T-Display S3 SCL pin
-#define BUTTON_PIN          14    // T-Display S3 boot button (GPIO 14)
+#define BUTTON_LEFT_PIN     0     // T-Display S3 left button (GPIO 0) - Calibration control
+#define BUTTON_RIGHT_PIN    14    // T-Display S3 right button (GPIO 14) - Display toggle
 #define BUTTON_DEBOUNCE_MS  200   // Button debounce time
 #define MAX_INT_PIN         1     // MAX30105 interrupt pin
-#define MPU_INT_PIN         2    // MPU6050 interrupt pin
+#define MPU_INT_PIN         2     // MPU6050 interrupt pin
 #define GSR_ADC_PIN         3     // GSR ADC pin (same as MAX_INT for now)
 #define GSR_ADC_CHANNEL     ADC_CHANNEL_0
 #define I2C_FREQ_HZ         100000
@@ -137,10 +139,12 @@ static bool gsr_available = false;
 /* Display and device info */
 static display_device_info_t g_device_info = {
     .device_name = "Shadow-9026",
-    .password = "12345678"
+    .password = NULL  // No password needed - removed for simplified pairing
 };
-static volatile int64_t last_button_press = 0;
+static volatile int64_t last_button_left_press = 0;
+static volatile int64_t last_button_right_press = 0;
 static bool adc_calibrated = false;
+static bool recalibration_confirm_pending = false;  // Track if waiting for confirmation
 
 /* Sensor statistics */
 static uint32_t total_inferences = 0;
@@ -166,6 +170,8 @@ typedef enum {
     SENSOR_EVENT_TEMP_TIMER,
     SENSOR_EVENT_MAX_POLL,  // Re-enabled for polling-based sampling
     SENSOR_EVENT_BUTTON_PRESS,  // Button press to toggle display
+    SENSOR_EVENT_BUTTON_LEFT,   // Left button (calibration control)
+    SENSOR_EVENT_BUTTON_RIGHT,  // Right button (display toggle)
 } sensor_event_type_t;
 
 typedef struct {
@@ -233,22 +239,47 @@ static void IRAM_ATTR mpu_interrupt_handler(void *arg) {
 }
 
 /**
- * Button interrupt handler - Toggle display mode
- * Debounced in ISR to avoid multiple triggers
+ * Left button interrupt handler - Calibration control
+ * Starts/stops calibration session
  */
-static void IRAM_ATTR button_interrupt_handler(void *arg) {
+static void IRAM_ATTR button_left_interrupt_handler(void *arg) {
     int64_t now = esp_timer_get_time() / 1000;  // Convert to ms
     
-    // Debounce: ignore if button pressed within last BUTTON_DEBOUNCE_MS
-    if (now - last_button_press < BUTTON_DEBOUNCE_MS) {
+    // Debounce
+    if (now - last_button_left_press < BUTTON_DEBOUNCE_MS) {
         return;
     }
     
-    last_button_press = now;
+    last_button_left_press = now;
     
-    // Send button press event
     sensor_event_t event = {
-        .type = SENSOR_EVENT_BUTTON_PRESS,  // Will need to add this enum
+        .type = SENSOR_EVENT_BUTTON_LEFT,
+        .timestamp_us = esp_timer_get_time(),
+        .sequence = 0
+    };
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xQueueSendFromISR(sensor_event_queue, &event, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
+    }
+}
+
+/**
+ * Right button interrupt handler - Display toggle
+ * Debounced in ISR to avoid multiple triggers
+ */
+static void IRAM_ATTR button_right_interrupt_handler(void *arg) {
+    int64_t now = esp_timer_get_time() / 1000;  // Convert to ms
+    
+    // Debounce
+    if (now - last_button_right_press < BUTTON_DEBOUNCE_MS) {
+        return;
+    }
+    
+    last_button_right_press = now;
+    
+    sensor_event_t event = {
+        .type = SENSOR_EVENT_BUTTON_RIGHT,
         .timestamp_us = esp_timer_get_time(),
         .sequence = 0
     };
@@ -1025,11 +1056,25 @@ static bool temp_timer_init(void) {
 static void enhanced_sensor_processing_task(void *pvParameters) {
     ESP_LOGI(TAG_DATA, "Enhanced Shadow sensor processing with ML integration started");
     
+    // Check stack watermark
+    UBaseType_t stack_high_water = uxTaskGetStackHighWaterMark(NULL);
+    ESP_LOGI(TAG_DATA, "Producer task stack: %u bytes free", stack_high_water * sizeof(StackType_t));
+    
     sensor_event_t event;
     TickType_t last_stats = xTaskGetTickCount();
+    uint32_t loop_count = 0;
     // Note: last_manual_poll removed - manual polling disabled for interrupt-only sampling
     
     while (1) {
+        loop_count++;
+        
+        // Check stack every 1000 iterations
+        if (loop_count % 1000 == 0) {
+            stack_high_water = uxTaskGetStackHighWaterMark(NULL);
+            if (stack_high_water < 256) {  // Less than 1KB free
+                ESP_LOGW(TAG_DATA, "⚠️ Producer stack low: %u bytes free", stack_high_water * sizeof(StackType_t));
+            }
+        }
         if (xQueueReceive(sensor_event_queue, &event, pdMS_TO_TICKS(100)) == pdTRUE) {
             
             switch (event.type) {
@@ -1043,6 +1088,12 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                             realtime_add_sample_int_isr(SENSOR_BVP, bvp_fixed);
                             bvp_sample_count++;
                             total_samples_collected++;
+                            
+                            // Update calibration with this single sample (if in progress)
+                            if (calibration_get_state() == CAL_STATE_IN_PROGRESS) {
+                                float bvp_float = (float)ir_value;
+                                calibration_update(&bvp_float, 1, CNN_CHANNEL_BVP);
+                            }
                             
                             // Log EVERY BVP sample (now decimated to ~4Hz)
                             ESP_LOGI(TAG_DATA, "[%" PRIu64 "] BVP: %lu → %.2f (#%lu)", 
@@ -1061,6 +1112,12 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                             realtime_add_sample_int_isr(SENSOR_ACC_Z, FLOAT_TO_FIXED(az));
                             acc_sample_count++;
                             total_samples_collected += 3;
+                            
+                            // Update calibration with this single sample (if in progress)
+                            if (calibration_get_state() == CAL_STATE_IN_PROGRESS) {
+                                float magnitude = sqrtf(ax*ax + ay*ay + az*az);
+                                calibration_update(&magnitude, 1, CNN_CHANNEL_ACC);
+                            }
                             
                             // Log EVERY ACC sample (now at ~4Hz from MPU)
                             float magnitude = sqrtf(ax*ax + ay*ay + az*az);
@@ -1082,6 +1139,11 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                             eda_sample_count++;
                             total_samples_collected++;
                             
+                            // Update calibration with this single sample (if in progress)
+                            if (calibration_get_state() == CAL_STATE_IN_PROGRESS) {
+                                calibration_update(&processed_voltage, 1, CNN_CHANNEL_EDA);
+                            }
+                            
                             ESP_LOGI(TAG_DATA, "[%" PRIu64 "] EDA: %.3fV (#%lu)", 
                                      event.timestamp_us, processed_voltage, eda_sample_count);
                         }
@@ -1096,13 +1158,59 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                         temp_sample_count++;
                         total_samples_collected++;
                         
+                        // Update calibration with this single sample (if in progress)
+                        if (calibration_get_state() == CAL_STATE_IN_PROGRESS) {
+                            calibration_update(&temp, 1, CNN_CHANNEL_TEMP);
+                        }
+                        
                         ESP_LOGI(TAG_DATA, "[%" PRIu64 "] TEMP: %.2f°C (#%lu)", 
                                  event.timestamp_us, temp, temp_sample_count);
                     }
                     break;
                 
+                case SENSOR_EVENT_BUTTON_LEFT:
+                    // Left button: Start calibration (auto-completes after 2 minutes)
+                    ESP_LOGI(TAG_MAIN, "🔘 Left button pressed - calibration control");
+                    if (calibration_get_state() == CAL_STATE_IN_PROGRESS) {
+                        ESP_LOGI(TAG_MAIN, "⏳ Calibration already in progress (%.1f%% complete)",
+                                 calibration_get_progress() * 100.0f);
+                        ESP_LOGI(TAG_MAIN, "   Please wait - will auto-complete after collecting enough samples");
+                    } else if (calibration_is_calibrated()) {
+                        // Device already calibrated - require double-press to re-calibrate
+                        if (recalibration_confirm_pending) {
+                            // Second press within timeout - start re-calibration
+                            ESP_LOGI(TAG_MAIN, "🔄 CONFIRMED: Starting re-calibration");
+                            ESP_LOGI(TAG_MAIN, "   ⚠️ This will overwrite existing calibration");
+                            calibration_start();
+                            recalibration_confirm_pending = false;
+                            ESP_LOGI(TAG_MAIN, "🟢 Re-calibration started (2 minutes, auto-completes)");
+                            ESP_LOGI(TAG_MAIN, "   ℹ️ Stay calm and still - will finish automatically");
+                        } else {
+                            // First press - set confirmation flag
+                            ESP_LOGI(TAG_MAIN, "⚠️ Device already calibrated");
+                            ESP_LOGI(TAG_MAIN, "   Press LEFT button AGAIN within 5 seconds to re-calibrate");
+                            ESP_LOGI(TAG_MAIN, "   (This will erase existing calibration)");
+                            recalibration_confirm_pending = true;
+                            
+                            // Start 5-second timeout timer (will be checked in main loop)
+                            last_button_left_press = esp_timer_get_time() / 1000;  // Store timestamp in ms
+                        }
+                    } else {
+                        ESP_LOGI(TAG_MAIN, "🟢 Starting calibration (2 minutes, auto-completes)");
+                        calibration_start();
+                        recalibration_confirm_pending = false;
+                        ESP_LOGI(TAG_MAIN, "   ℹ️ Stay calm and still - will finish automatically");
+                    }
+                    break;
+                
+                case SENSOR_EVENT_BUTTON_RIGHT:
+                    // Right button: Toggle display mode (clock <-> QR code)
+                    ESP_LOGI(TAG_MAIN, "🔘 Right button pressed - toggling display");
+                    display_toggle_mode(&g_device_info);
+                    break;
+                
                 case SENSOR_EVENT_BUTTON_PRESS:
-                    // Toggle display mode (clock <-> QR code)
+                    // Legacy button handler - map to right button behavior
                     ESP_LOGI(TAG_MAIN, "🔘 Button pressed - toggling display");
                     display_toggle_mode(&g_device_info);
                     break;
@@ -1124,6 +1232,16 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                      bvp_sample_count, acc_sample_count, eda_sample_count, temp_sample_count);
             ESP_LOGI(TAG_MAIN, "🔄 ML Ready Signals: %u", uxSemaphoreGetCount(g_sensor_system.ml_ready_sem));
             last_stats = now;
+        }
+        
+        // Check re-calibration confirmation timeout (5 seconds)
+        if (recalibration_confirm_pending) {
+            int64_t current_time_ms = esp_timer_get_time() / 1000;
+            int64_t elapsed_ms = current_time_ms - last_button_left_press;
+            if (elapsed_ms > 5000) {  // 5 second timeout
+                ESP_LOGI(TAG_MAIN, "⏱️ Re-calibration confirmation timeout - cancelled");
+                recalibration_confirm_pending = false;
+            }
         }
     }
 }
@@ -1158,18 +1276,30 @@ static esp_err_t setup_gpio_interrupts(void) {
         ESP_LOGI(TAG_MPU, "Interrupt on GPIO%d", MPU_INT_PIN);
     }
     
-    // Setup button GPIO for display toggle
-    gpio_config_t btn_conf = {
-        .pin_bit_mask = (1ULL << BUTTON_PIN),
+    // Setup button GPIOs
+    // Left button (GPIO 0) - Calibration control
+    gpio_config_t btn_left_conf = {
+        .pin_bit_mask = (1ULL << BUTTON_LEFT_PIN),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,  // Button pulls to GND when pressed
+        .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_NEGEDGE,    // Trigger on button press (falling edge)
+        .intr_type = GPIO_INTR_NEGEDGE
     };
+    ESP_ERROR_CHECK(gpio_config(&btn_left_conf));
+    ESP_ERROR_CHECK(gpio_isr_handler_add(BUTTON_LEFT_PIN, button_left_interrupt_handler, NULL));
+    ESP_LOGI(TAG_MAIN, "✅ Left button (GPIO %d) configured for calibration control", BUTTON_LEFT_PIN);
     
-    ESP_ERROR_CHECK(gpio_config(&btn_conf));
-    ESP_ERROR_CHECK(gpio_isr_handler_add(BUTTON_PIN, button_interrupt_handler, NULL));
-    ESP_LOGI(TAG_MAIN, "Button interrupt on GPIO%d", BUTTON_PIN);
+    // Right button (GPIO 14) - Display toggle
+    gpio_config_t btn_right_conf = {
+        .pin_bit_mask = (1ULL << BUTTON_RIGHT_PIN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_NEGEDGE
+    };
+    ESP_ERROR_CHECK(gpio_config(&btn_right_conf));
+    ESP_ERROR_CHECK(gpio_isr_handler_add(BUTTON_RIGHT_PIN, button_right_interrupt_handler, NULL));
+    ESP_LOGI(TAG_MAIN, "✅ Right button (GPIO %d) configured for display toggle", BUTTON_RIGHT_PIN);
     
     return ESP_OK;
 }
@@ -1179,28 +1309,68 @@ void consumer_task(void *param) {
     ESP_LOGI(TAG, "🧠 Consumer started (Core %d)", xPortGetCoreID());
     ESP_LOGI(TAG, "🎯 Real sensor integration: MAX30105 + MPU6050 + GSR + TEMP(mock)");
     ESP_LOGI(TAG, "🧠 CNN Pipeline: Signal preprocessing → CNN inference → BLE");
+    
+    // Check stack watermark
+    UBaseType_t stack_high_water = uxTaskGetStackHighWaterMark(NULL);
+    ESP_LOGI(TAG, "Consumer task stack: %u bytes free", stack_high_water * sizeof(StackType_t));
+    
     vTaskDelay(pdMS_TO_TICKS(3000)); /* warm-up delay */
 
-    // Allocate buffers for CNN input
-    cnn_input_tensor_t cnn_input;
+    // Allocate CNN input buffer in PSRAM to avoid stack overflow (3.75KB is too large for 8KB stack)
+    cnn_input_tensor_t *cnn_input = (cnn_input_tensor_t*)heap_caps_malloc(sizeof(cnn_input_tensor_t), MALLOC_CAP_SPIRAM);
+    if (cnn_input == NULL) {
+        ESP_LOGE(TAG, "❌ Failed to allocate CNN input buffer in PSRAM");
+        vTaskDelete(NULL);
+        return;
+    }
+    ESP_LOGI(TAG, "✅ CNN input buffer allocated in PSRAM: %u bytes", sizeof(cnn_input_tensor_t));
+    
     cnn_inference_result_t cnn_result;
+    
+    uint32_t loop_count = 0;
 
     while (1) {
+        loop_count++;
+        
+        // Check stack every 10 iterations
+        if (loop_count % 10 == 0) {
+            stack_high_water = uxTaskGetStackHighWaterMark(NULL);
+            if (stack_high_water < 512) {  // Less than 2KB free
+                ESP_LOGW(TAG, "⚠️ Consumer stack low: %u bytes free", stack_high_water * sizeof(StackType_t));
+            }
+        }
         // Wait for ML-ready signal from realtime sensor system
         if (xSemaphoreTake(g_sensor_system.ml_ready_sem, portMAX_DELAY) == pdTRUE) {
+            uint32_t min_batches = realtime_get_min_batch_count();
+            
+            // Check if calibration is in progress
+            if (calibration_get_state() == CAL_STATE_IN_PROGRESS) {
+                ESP_LOGI(TAG, "📊 Calibration in progress - preprocessing for calibration data");
+                
+                // Run preprocessing to feed calibration system (but skip CNN)
+                int preprocess_ret = preprocess_for_cnn(&g_sensor_system, cnn_input);
+                
+                if (preprocess_ret != 0) {
+                    ESP_LOGE(TAG, "❌ Preprocessing failed during calibration (%d)", preprocess_ret);
+                }
+                
+                // Mark batch as processed and skip CNN inference
+                realtime_mark_batch_processed(min_batches);
+                continue;
+            }
+            
             total_inferences++;
             ESP_LOGI(TAG, "🔔 CNN Inference #%lu", total_inferences);
             uint32_t t_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
             // Get minimum synchronized batch count across all sensors
-            uint32_t min_batches = realtime_get_min_batch_count();
             ESP_LOGI(TAG, "🎯 Min synchronized batches: %lu sec", min_batches);
 
             /* ==================== NEW CNN PIPELINE ==================== */
             
             // Step 1: Preprocess sensor data for CNN input
             uint32_t preprocess_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
-            int preprocess_ret = preprocess_for_cnn(&g_sensor_system, &cnn_input);
+            int preprocess_ret = preprocess_for_cnn(&g_sensor_system, cnn_input);
             uint32_t preprocess_time = (xTaskGetTickCount() * portTICK_PERIOD_MS) - preprocess_start;
             
             if (preprocess_ret != 0) {
@@ -1212,7 +1382,7 @@ void consumer_task(void *param) {
 
             // Step 2: Run CNN inference
             uint32_t cnn_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
-            int cnn_ret = cnn_inference_predict(&cnn_input, &cnn_result);
+            int cnn_ret = cnn_inference_predict(cnn_input, &cnn_result);
             uint32_t cnn_time = (xTaskGetTickCount() * portTICK_PERIOD_MS) - cnn_start;
 
             // Mark batch as processed
@@ -1458,7 +1628,7 @@ void app_main(void) {
 
     // Initialize BLE pairing service (separate service for device management)
     ESP_LOGI(TAG, "🔐 Initializing BLE pairing service...");
-    if (ble_pairing_init(NULL) != 0) {  // NULL = auto-generate device name
+    if (ble_pairing_init(g_device_info.device_name) != 0) {  // Use configured device name
         ESP_LOGE(TAG, "❌ Failed to initialize BLE pairing service");
         return;
     }
@@ -1495,6 +1665,20 @@ void app_main(void) {
                  used_bytes / 1024, total_bytes / 1024,
                  (used_bytes * 100.0f) / total_bytes);
         ESP_LOGI(TAG, "   Free heap after CNN init: %lu bytes", esp_get_free_heap_size());
+    }
+
+    /* ================= INITIALIZE CALIBRATION SYSTEM ================= */
+    ESP_LOGI(TAG, "🎯 Initializing calibration system...");
+    if (calibration_init() != 0) {
+        ESP_LOGW(TAG, "⚠️ Calibration initialization failed - will use local normalization");
+    } else {
+        if (calibration_is_calibrated()) {
+            ESP_LOGI(TAG, "✅ Device is calibrated with personalized baseline");
+            ESP_LOGI(TAG, "   Press LEFT button to re-calibrate if needed");
+        } else {
+            ESP_LOGW(TAG, "⚠️ Device NOT calibrated - predictions may be less accurate");
+            ESP_LOGI(TAG, "   👉 Press LEFT button when calm to start 2-minute calibration");
+        }
     }
 
     /* ================= INITIALIZE HARDWARE ================= */
@@ -1565,7 +1749,7 @@ void app_main(void) {
     BaseType_t producer_result = xTaskCreatePinnedToCore(
         enhanced_sensor_processing_task,
         "shadow_producer",
-        8192,
+        4096,                 // Reduced from 8KB to 4KB
         NULL,
         5,                    // High priority for sensor data
         &producer_task_handle,
@@ -1586,7 +1770,7 @@ void app_main(void) {
     BaseType_t consumer_result = xTaskCreatePinnedToCore(
         consumer_task,
         "shadow_consumer", 
-        16384,                // Reduced from 32KB to 16KB (ML tensor arena is in PSRAM)
+        8192,                 // Reduced from 16KB to 8KB (ML tensor arena is in PSRAM)
         NULL,
         3,                    // Lower priority than producer
         &consumer_task_handle,

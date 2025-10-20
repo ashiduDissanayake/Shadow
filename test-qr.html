@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shadow QR Code Tester</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        #qrcode {
+            margin: 20px auto;
+            display: inline-block;
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            width: 200px;
+            margin: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0051D5;
+        }
+        .info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔲 Shadow QR Code Tester</h1>
+    
+    <div class="info">
+        <p><strong>Test your QR scanner without ESP32!</strong></p>
+        <p>Enter a device name and generate a QR code to test scanning.</p>
+    </div>
+    
+    <div>
+        <input type="text" id="deviceName" value="Shadow-9026" placeholder="Shadow-XXXX">
+        <button onclick="generateQR()">Generate QR</button>
+    </div>
+    
+    <div id="qrcode"></div>
+    
+    <div class="info">
+        <p><strong>Current Value:</strong> <span id="currentValue">Shadow-9026</span></p>
+        <p><small>ESP32 format: Just device name (e.g., "Shadow-9026")</small></p>
+    </div>
+    
+    <h3>How to test:</h3>
+    <ol style="text-align: left;">
+        <li>Open your Shadow macOS app</li>
+        <li>Click "Scan QR Code"</li>
+        <li>Point your Mac camera at this QR code on screen</li>
+        <li>It should detect and pair automatically</li>
+    </ol>
+    
+    <div class="info">
+        <h4>Console Output to Check:</h4>
+        <pre style="text-align: left; font-size: 12px;">
+🎥 QRScannerView appeared - starting camera
+✅ Camera permission granted
+📹 Found camera device: FaceTime HD Camera
+✅ Camera session started
+📸 Metadata received: 1 objects
+📸 QR Code detected: Shadow-9026
+✅ Device paired: Shadow-9026
+        </pre>
+    </div>
+    
+    <script>
+        let qrcodeObj = null;
+        
+        function generateQR() {
+            const deviceName = document.getElementById('deviceName').value || 'Shadow-9026';
+            document.getElementById('currentValue').textContent = deviceName;
+            
+            // Clear old QR
+            const qrDiv = document.getElementById('qrcode');
+            qrDiv.innerHTML = '';
+            
+            // Generate new QR
+            qrcodeObj = new QRCode(qrDiv, {
+                text: deviceName,
+                width: 300,
+                height: 300,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        }
+        
+        // Generate initial QR on load
+        window.onload = generateQR;
+    </script>
+</body>
+</html>

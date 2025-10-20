@@ -36,6 +36,7 @@
 
 #include <string.h>
 #include "ble_stress_service.h"
+#include "ble_pairing.h"  // For pairing event forwarding
 #include "stress_fsm.h"
 #include "event_log.h"
 
@@ -258,6 +259,23 @@ static void on_write_event(esp_ble_gatts_cb_param_t *param) {
                                 param->write.trans_id,
                                 ESP_GATT_OK,
                                 NULL);
+
+    /* Try to send an indication immediately so central receives the prepared response
+       without requiring an explicit read. If client hasn't enabled CCCD or indication
+       fails, that is handled gracefully. */
+    if (g_resp_len > 0) {
+        esp_err_t rc = esp_ble_gatts_send_indicate(g_gatts_if,
+                                                   param->write.conn_id,
+                                                   g_char_handle,
+                                                   g_resp_len,
+                                                   g_resp_buffer,
+                                                   false);
+        if (rc != ESP_OK) {
+            ESP_LOGW(TAG, "send_indicate failed: %d", rc);
+        } else {
+            ESP_LOGI(TAG, "Sent indicate (len=%u)", g_resp_len);
+        }
+    }
 }
 
 /* Read handler */
@@ -293,11 +311,16 @@ static void on_read_event(esp_ble_gatts_cb_param_t *param) {
     g_have_extended = false; // one-shot
 }
 
-/* GATT server callback */
+/* GATT server callback - dispatches to both stress and pairing services */
 static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                      esp_ble_gatts_cb_param_t *param) {
+    // Forward ALL events to pairing service (it filters by app_id internally)
+    ble_pairing_gatts_handler(event, gatts_if, param);
+    
+    // Handle stress service events (app_id=0 only)
     if (event == ESP_GATTS_REG_EVT) {
-        if (param->reg.status == ESP_GATT_OK) {
+        // Only process registration for our app_id (0)
+        if (param->reg.status == ESP_GATT_OK && param->reg.app_id == 0) {
             g_gatts_if = gatts_if;
             ESP_LOGI(TAG, "GATT registered");
             esp_gatt_srvc_id_t sid = {
@@ -309,12 +332,13 @@ static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                 }
             };
             esp_ble_gatts_create_service(gatts_if, &sid, 4);
-        } else {
+        } else if (param->reg.status != ESP_GATT_OK && param->reg.app_id == 0) {
             ESP_LOGE(TAG, "GATT reg failed: %d", param->reg.status);
         }
         return;
     }
 
+    // Filter all other events by gatts_if (only process our own)
     if (gatts_if != g_gatts_if) return;
 
     switch (event) {
@@ -329,7 +353,7 @@ static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                 .uuid = { .uuid16 = SIMPLE_CHAR_UUID }
             };
             esp_gatt_char_prop_t prop =
-                ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
+                ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
             esp_ble_gatts_add_char(g_service_handle, &uuid,
                                    ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
                                    prop, NULL, NULL);
@@ -340,6 +364,16 @@ static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         if (param->add_char.status == ESP_GATT_OK) {
             g_char_handle = param->add_char.attr_handle;
             ESP_LOGI(TAG, "Characteristic added handle=%u", g_char_handle);
+
+            /* Add CCCD descriptor so clients can enable notifications/indications */
+            esp_bt_uuid_t cccd_uuid = { .len = ESP_UUID_LEN_16, .uuid = { .uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG } };
+            esp_err_t rc = esp_ble_gatts_add_char_descr(g_service_handle, &cccd_uuid,
+                                                       ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+                                                       NULL, NULL);
+            if (rc != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to add CCCD descriptor: %d", rc);
+            }
+
             update_advertisement();
         } else {
             ESP_LOGE(TAG, "Add char failed: %d", param->add_char.status);

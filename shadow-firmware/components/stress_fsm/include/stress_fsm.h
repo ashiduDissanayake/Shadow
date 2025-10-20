@@ -22,9 +22,9 @@
 #include "freertos/semphr.h"
 
 // FSM Configuration
-#define STRESS_THRESHOLD                0.7f        // ML probability threshold for stress detection
+#define STRESS_THRESHOLD                0.5f        // ML probability threshold for stress detection
 #define CONSECUTIVE_REQUIRED            3           // Required consecutive inferences for state confirmation
-#define FSM_HYSTERESIS_ENABLED          1           // Enable hysteresis to prevent oscillations
+#define FSM_HYSTERESIS_ENABLED          0           // Enable hysteresis to prevent oscillations
 
 // If hysteresis is enabled, require more confirmations to return to calm
 #if FSM_HYSTERESIS_ENABLED

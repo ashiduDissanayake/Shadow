@@ -4,6 +4,7 @@
  */
 
 #include "signal_preprocessor.h"
+#include "calibration.h"
 #include <string.h>
 
 static const char *TAG = "SignalPreprocessor";
@@ -17,6 +18,9 @@ int signal_preprocessor_init(void) {
     ESP_LOGI(TAG, "  Expected sample rate: %dHz for all sensors", CNN_SAMPLE_RATE);
     ESP_LOGI(TAG, "  Window duration: %d seconds", CNN_WINDOW_DURATION);
     ESP_LOGI(TAG, "  Memory usage: %lu bytes", signal_preprocessor_get_memory_usage());
+    
+    // Initialize calibration system
+    calibration_init();
     
     return 0;
 }
@@ -134,13 +138,24 @@ int preprocess_for_cnn(realtime_sensor_system_t *sensor_system,
     
     /* ==================== STEP 1: Extract raw sensor data ==================== */
     
-    // Temporary buffers for sensor data (240 samples @ 4Hz)
-    fixed_point_t acc_x_fixed[CNN_INPUT_SAMPLES];
-    fixed_point_t acc_y_fixed[CNN_INPUT_SAMPLES];
-    fixed_point_t acc_z_fixed[CNN_INPUT_SAMPLES];
-    fixed_point_t bvp_fixed[CNN_INPUT_SAMPLES];
-    fixed_point_t eda_fixed[CNN_INPUT_SAMPLES];
-    fixed_point_t temp_fixed[CNN_INPUT_SAMPLES];
+    // Allocate temporary buffers in PSRAM to avoid stack overflow (240 samples @ 4Hz)
+    fixed_point_t *acc_x_fixed = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(fixed_point_t), MALLOC_CAP_SPIRAM);
+    fixed_point_t *acc_y_fixed = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(fixed_point_t), MALLOC_CAP_SPIRAM);
+    fixed_point_t *acc_z_fixed = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(fixed_point_t), MALLOC_CAP_SPIRAM);
+    fixed_point_t *bvp_fixed = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(fixed_point_t), MALLOC_CAP_SPIRAM);
+    fixed_point_t *eda_fixed = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(fixed_point_t), MALLOC_CAP_SPIRAM);
+    fixed_point_t *temp_fixed = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(fixed_point_t), MALLOC_CAP_SPIRAM);
+    
+    if (!acc_x_fixed || !acc_y_fixed || !acc_z_fixed || !bvp_fixed || !eda_fixed || !temp_fixed) {
+        ESP_LOGE(TAG, "❌ Failed to allocate fixed-point buffers in PSRAM");
+        free(acc_x_fixed);
+        free(acc_y_fixed);
+        free(acc_z_fixed);
+        free(bvp_fixed);
+        free(eda_fixed);
+        free(temp_fixed);
+        return -1;
+    }
     
     // Extract from ring buffers
     int acc_x_count = realtime_extract_window(SENSOR_ACC_X, acc_x_fixed, CNN_INPUT_SAMPLES);
@@ -163,12 +178,23 @@ int preprocess_for_cnn(realtime_sensor_system_t *sensor_system,
     
     /* ==================== STEP 2: Convert from fixed-point to float ==================== */
     
-    float acc_x[CNN_INPUT_SAMPLES];
-    float acc_y[CNN_INPUT_SAMPLES];
-    float acc_z[CNN_INPUT_SAMPLES];
-    float bvp[CNN_INPUT_SAMPLES];
-    float eda[CNN_INPUT_SAMPLES];
-    float temp[CNN_INPUT_SAMPLES];
+    // Allocate float buffers in PSRAM
+    float *acc_x = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(float), MALLOC_CAP_SPIRAM);
+    float *acc_y = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(float), MALLOC_CAP_SPIRAM);
+    float *acc_z = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(float), MALLOC_CAP_SPIRAM);
+    float *bvp = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(float), MALLOC_CAP_SPIRAM);
+    float *eda = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(float), MALLOC_CAP_SPIRAM);
+    float *temp = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(float), MALLOC_CAP_SPIRAM);
+    
+    if (!acc_x || !acc_y || !acc_z || !bvp || !eda || !temp) {
+        ESP_LOGE(TAG, "❌ Failed to allocate float buffers in PSRAM");
+        // Free all buffers
+        free(acc_x_fixed); free(acc_y_fixed); free(acc_z_fixed);
+        free(bvp_fixed); free(eda_fixed); free(temp_fixed);
+        free(acc_x); free(acc_y); free(acc_z);
+        free(bvp); free(eda); free(temp);
+        return -1;
+    }
     
     for (int i = 0; i < CNN_INPUT_SAMPLES; i++) {
         acc_x[i] = FIXED_TO_FLOAT(acc_x_fixed[i]);
@@ -181,10 +207,26 @@ int preprocess_for_cnn(realtime_sensor_system_t *sensor_system,
     
     /* ==================== STEP 3: Compute ACC magnitude ==================== */
     
-    float acc_mag[CNN_INPUT_SAMPLES];
+    // Allocate ACC magnitude buffer in PSRAM
+    float *acc_mag = heap_caps_malloc(CNN_INPUT_SAMPLES * sizeof(float), MALLOC_CAP_SPIRAM);
+    if (!acc_mag) {
+        ESP_LOGE(TAG, "❌ Failed to allocate ACC magnitude buffer in PSRAM");
+        // Free all buffers
+        free(acc_x_fixed); free(acc_y_fixed); free(acc_z_fixed);
+        free(bvp_fixed); free(eda_fixed); free(temp_fixed);
+        free(acc_x); free(acc_y); free(acc_z);
+        free(bvp); free(eda); free(temp);
+        return -1;
+    }
+    
     int ret = compute_acc_magnitude(acc_x, acc_y, acc_z, acc_mag, CNN_INPUT_SAMPLES);
     if (ret != 0) {
         ESP_LOGE(TAG, "Failed to compute ACC magnitude");
+        // Free all buffers
+        free(acc_x_fixed); free(acc_y_fixed); free(acc_z_fixed);
+        free(bvp_fixed); free(eda_fixed); free(temp_fixed);
+        free(acc_x); free(acc_y); free(acc_z);
+        free(bvp); free(eda); free(temp); free(acc_mag);
         return -3;
     }
     
@@ -197,37 +239,82 @@ int preprocess_for_cnn(realtime_sensor_system_t *sensor_system,
     memcpy(output->data[CNN_CHANNEL_EDA], eda, CNN_INPUT_SAMPLES * sizeof(float));
     memcpy(output->data[CNN_CHANNEL_TEMP], temp, CNN_INPUT_SAMPLES * sizeof(float));
     
+    /* ==================== STEP 4.5: Calibration progress logging ==================== */
+    
+    if (calibration_get_state() == CAL_STATE_IN_PROGRESS) {
+        // NOTE: Calibration samples are now fed in real-time as sensors produce data
+        // (see main_realtime.c producer task) to avoid double-counting from overlapping windows
+        ESP_LOGI(TAG, "📊 Calibration progress: %.1f%%", calibration_get_progress() * 100.0f);
+    }
+    
     /* ==================== STEP 5: Z-score normalization per channel ==================== */
     
+    // DEBUG: Print raw statistics BEFORE normalization
+    signal_stats_t raw_acc_stats, raw_bvp_stats, raw_eda_stats, raw_temp_stats;
+    compute_signal_stats(output->data[CNN_CHANNEL_ACC], CNN_INPUT_SAMPLES, &raw_acc_stats);
+    compute_signal_stats(output->data[CNN_CHANNEL_BVP], CNN_INPUT_SAMPLES, &raw_bvp_stats);
+    compute_signal_stats(output->data[CNN_CHANNEL_EDA], CNN_INPUT_SAMPLES, &raw_eda_stats);
+    compute_signal_stats(output->data[CNN_CHANNEL_TEMP], CNN_INPUT_SAMPLES, &raw_temp_stats);
+    
+    ESP_LOGI(TAG, "📊 RAW channel statistics (BEFORE normalization):");
+    ESP_LOGI(TAG, "  ACC:  mean=%.6f, std=%.6f", raw_acc_stats.mean, raw_acc_stats.std);
+    ESP_LOGI(TAG, "  BVP:  mean=%.6f, std=%.6f", raw_bvp_stats.mean, raw_bvp_stats.std);
+    ESP_LOGI(TAG, "  EDA:  mean=%.6f, std=%.6f", raw_eda_stats.mean, raw_eda_stats.std);
+    ESP_LOGI(TAG, "  TEMP: mean=%.6f, std=%.6f", raw_temp_stats.mean, raw_temp_stats.std);
+    
+    // Print calibration statistics
+    if (calibration_is_calibrated()) {
+        float cal_mean, cal_std;
+        ESP_LOGI(TAG, "📐 Calibration statistics:");
+        if (calibration_get_stats(CNN_CHANNEL_ACC, &cal_mean, &cal_std) == 0) {
+            ESP_LOGI(TAG, "  ACC:  cal_mean=%.6f, cal_std=%.6f", cal_mean, cal_std);
+        }
+        if (calibration_get_stats(CNN_CHANNEL_BVP, &cal_mean, &cal_std) == 0) {
+            ESP_LOGI(TAG, "  BVP:  cal_mean=%.6f, cal_std=%.6f", cal_mean, cal_std);
+        }
+        if (calibration_get_stats(CNN_CHANNEL_EDA, &cal_mean, &cal_std) == 0) {
+            ESP_LOGI(TAG, "  EDA:  cal_mean=%.6f, cal_std=%.6f", cal_mean, cal_std);
+        }
+        if (calibration_get_stats(CNN_CHANNEL_TEMP, &cal_mean, &cal_std) == 0) {
+            ESP_LOGI(TAG, "  TEMP: cal_mean=%.6f, cal_std=%.6f", cal_mean, cal_std);
+        }
+    }
+    
+    // Use calibration-aware normalization (falls back to local if not calibrated)
+    
     // Normalize ACC magnitude
-    ret = normalize_signal_zscore(output->data[CNN_CHANNEL_ACC], CNN_INPUT_SAMPLES);
+    ret = calibration_normalize(output->data[CNN_CHANNEL_ACC], CNN_INPUT_SAMPLES, CNN_CHANNEL_ACC);
     if (ret != 0) {
         ESP_LOGE(TAG, "Failed to normalize ACC channel");
         return -4;
     }
     
     // Normalize BVP
-    ret = normalize_signal_zscore(output->data[CNN_CHANNEL_BVP], CNN_INPUT_SAMPLES);
+    ret = calibration_normalize(output->data[CNN_CHANNEL_BVP], CNN_INPUT_SAMPLES, CNN_CHANNEL_BVP);
     if (ret != 0) {
         ESP_LOGE(TAG, "Failed to normalize BVP channel");
         return -5;
     }
     
     // Normalize EDA
-    ret = normalize_signal_zscore(output->data[CNN_CHANNEL_EDA], CNN_INPUT_SAMPLES);
+    ret = calibration_normalize(output->data[CNN_CHANNEL_EDA], CNN_INPUT_SAMPLES, CNN_CHANNEL_EDA);
     if (ret != 0) {
         ESP_LOGE(TAG, "Failed to normalize EDA channel");
         return -6;
     }
     
     // Normalize TEMP
-    ret = normalize_signal_zscore(output->data[CNN_CHANNEL_TEMP], CNN_INPUT_SAMPLES);
+    ret = calibration_normalize(output->data[CNN_CHANNEL_TEMP], CNN_INPUT_SAMPLES, CNN_CHANNEL_TEMP);
     if (ret != 0) {
         ESP_LOGE(TAG, "Failed to normalize TEMP channel");
         return -7;
     }
     
-    ESP_LOGI(TAG, "Applied z-score normalization to all channels");
+    if (calibration_is_calibrated()) {
+        ESP_LOGI(TAG, "Applied CALIBRATED z-score normalization to all channels");
+    } else {
+        ESP_LOGI(TAG, "Applied LOCAL z-score normalization to all channels (not calibrated)");
+    }
     
     /* ==================== STEP 6: Compute statistics for debugging ==================== */
     
@@ -237,7 +324,7 @@ int preprocess_for_cnn(realtime_sensor_system_t *sensor_system,
     compute_signal_stats(output->data[CNN_CHANNEL_EDA], CNN_INPUT_SAMPLES, &eda_stats);
     compute_signal_stats(output->data[CNN_CHANNEL_TEMP], CNN_INPUT_SAMPLES, &temp_stats);
     
-    ESP_LOGI(TAG, "Channel statistics:");
+    ESP_LOGI(TAG, "📊 NORMALIZED channel statistics (AFTER calibration normalization):");
     ESP_LOGI(TAG, "  ACC:  mean=%.6f, std=%.6f, min=%.6f, max=%.6f",
              acc_stats.mean, acc_stats.std, acc_stats.min, acc_stats.max);
     ESP_LOGI(TAG, "  BVP:  mean=%.6f, std=%.6f, min=%.6f, max=%.6f",
@@ -254,6 +341,22 @@ int preprocess_for_cnn(realtime_sensor_system_t *sensor_system,
     output->timestamp = xTaskGetTickCount();
     
     ESP_LOGI(TAG, "✅ Preprocessing completed in %lu ms", output->preprocessing_time_ms);
+    
+    /* ==================== STEP 8: Free temporary buffers ==================== */
+    
+    free(acc_x_fixed);
+    free(acc_y_fixed);
+    free(acc_z_fixed);
+    free(bvp_fixed);
+    free(eda_fixed);
+    free(temp_fixed);
+    free(acc_x);
+    free(acc_y);
+    free(acc_z);
+    free(bvp);
+    free(eda);
+    free(temp);
+    free(acc_mag);
     
     return 0;
 }

@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_gap_ble_api.h"
+#include "esp_gatts_api.h"  // For GATT server types
 
 #ifdef __cplusplus
 extern "C" {
@@ -242,6 +243,13 @@ int ble_pairing_get_device_name(char *name, size_t max_len);
  * @brief Print pairing status to console (debug)
  */
 void ble_pairing_print_status(void);
+
+/**
+ * @brief GATT server callback for pairing service (called by stress service dispatcher)
+ * @note This should be called from the main GATT callback to forward pairing events
+ */
+void ble_pairing_gatts_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+                                esp_ble_gatts_cb_param_t *param);
 
 #ifdef __cplusplus
 }

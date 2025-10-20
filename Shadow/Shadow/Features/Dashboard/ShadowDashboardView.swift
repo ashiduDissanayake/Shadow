@@ -10,11 +10,8 @@ struct ShadowDashboardView: View {
     let onShowProfile: () -> Void
     
     @State private var showingDebugLog = false
-    @State private var showingCoreDataDebug = false
     @State private var recentEvents: [StressEvent] = []
-    @State private var showingPairingAlert = false
-    @State private var pairingError: String?
-    @State private var isPairing = false
+    @State private var showQRScanner = false
     
     var body: some View {
         ScrollView {
@@ -26,7 +23,6 @@ struct ShadowDashboardView: View {
                     recentEventsSection
                 }
                 
-                debugSection
                 Spacer(minLength: 20)
             }
             .padding(.horizontal, 20)
@@ -46,17 +42,12 @@ struct ShadowDashboardView: View {
         .sheet(isPresented: $showingDebugLog) {
             ShadowDebugLogView(syncViewModel: syncViewModel)
         }
-        .sheet(isPresented: $showingCoreDataDebug) {
-            CoreDataDebugView()
-        }
-        .alert("Device Pairing", isPresented: $showingPairingAlert) {
-            Button("OK") { }
-        } message: {
-            if let error = pairingError {
-                Text("Pairing failed: \(error)")
-            } else {
-                Text("Device paired successfully! ✅")
-            }
+        .sheet(isPresented: $showQRScanner) {
+            QRScannerView(onDeviceScanned: { deviceName in
+                print("✅ Device paired: \(deviceName)")
+                showQRScanner = false
+                syncViewModel.start()
+            })
         }
         .onAppear {
             syncViewModel.start()
@@ -112,7 +103,6 @@ struct ShadowDashboardView: View {
             VStack(spacing: 12) {
                 statusRow("System Status", syncViewModel.stateText, systemColor: systemStatusColor)
                 statusRow("Last Sync", syncViewModel.lastSync, systemColor: .secondary)
-                statusRow("Sequence Info", syncViewModel.sequenceStatus, systemColor: .secondary)
                 statusRow("Events Received", "\(syncViewModel.eventsReceived)", systemColor: .secondary)
                 
                 Divider()
@@ -124,17 +114,27 @@ struct ShadowDashboardView: View {
             
             HStack(spacing: 12) {
                 if syncViewModel.isActive {
-                    Button("Stop Sync") { syncViewModel.stop() }
+                    Button("Stop") { syncViewModel.stop() }
                         .buttonStyle(ShadowButtonStyle(color: .orange))
                 } else {
-                    Button("Start Sync") { syncViewModel.start() }
+                    Button("Start") { syncViewModel.start() }
                         .buttonStyle(ShadowButtonStyle(color: .blue))
                 }
                 
-                Button("Refresh Data") {
+                Button("Refresh") {
                     recentEvents = syncViewModel.getRecentEvents()
                 }
                 .buttonStyle(ShadowButtonStyle(color: .green))
+                
+                if syncViewModel.manager.isPairedToDevice {
+                    Button("Forget") {
+                        Task {
+                            try? await syncViewModel.manager.unpairDevice()
+                            UserDefaults.standard.removeObject(forKey: "paired_device_id")
+                        }
+                    }
+                    .buttonStyle(ShadowButtonStyle(color: .red))
+                }
             }
         }
         .padding()
@@ -155,7 +155,7 @@ struct ShadowDashboardView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                 Spacer()
-                Text("\(recentEvents.count) events")
+                Text("\(recentEvents.count)")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
                     .padding(.horizontal, 8)
@@ -167,68 +167,8 @@ struct ShadowDashboardView: View {
             }
             
             VStack(spacing: 8) {
-                ForEach(Array(recentEvents.prefix(3)), id: \.objectID) { event in
+                ForEach(Array(recentEvents.prefix(5)), id: \.objectID) { event in
                     RecentStressEventRow(event: event)
-                }
-                
-                if recentEvents.isEmpty {
-                    Text("No recent activity")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
-                        .italic()
-                        .padding(.vertical, 8)
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
-        )
-    }
-    
-        // MARK: Debug Section
-    private var debugSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "ladybug")
-                    .font(.title2)
-                    .foregroundColor(.orange)
-                Text("Debug Tools")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                Spacer()
-            }
-            
-            VStack(spacing: 8) {
-                Button(action: { showingDebugLog = true }) {
-                    HStack {
-                        Image(systemName: "doc.text")
-                        Text("BLE Debug Log")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.blue.opacity(0.2))
-                    )
-                }
-                
-                Button(action: { showingCoreDataDebug = true }) {
-                    HStack {
-                        Image(systemName: "cylinder.split.1x2")
-                        Text("Core Data Manager")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.purple.opacity(0.2))
-                    )
                 }
             }
         }
@@ -282,17 +222,17 @@ struct ShadowDashboardView: View {
     private var pairingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "lock.shield")
-                    .foregroundColor(syncViewModel.manager.isPaired ? .green : .orange)
+                Image(systemName: syncViewModel.manager.isPairedToDevice ? "checkmark.shield.fill" : "lock.shield")
+                    .foregroundColor(syncViewModel.manager.isPairedToDevice ? .green : .orange)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Device Pairing")
+                    Text("Device Status")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                     
-                    if let deviceInfo = syncViewModel.manager.deviceInfo {
-                        Text("\(deviceInfo.deviceName) - \(deviceInfo.firmwareVersion)")
+                    if let deviceName = syncViewModel.manager.pairedDeviceName {
+                        Text(deviceName)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.7))
                     } else {
@@ -304,62 +244,36 @@ struct ShadowDashboardView: View {
                 
                 Spacer()
                 
-                // Pairing state indicator
-                HStack(spacing: 4) {
-                    Text(syncViewModel.manager.pairingState.emoji)
-                    Text(syncViewModel.manager.pairingState.description)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
+                // Status badge
+                Text(syncViewModel.manager.isPairedToDevice ? "Paired" : "Unpaired")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(syncViewModel.manager.isPairedToDevice ? Color.green : Color.orange)
+                    )
             }
             
             // Pairing button
-            if !syncViewModel.manager.isPaired {
+            if !syncViewModel.manager.isPairedToDevice {
                 Button(action: {
-                    isPairing = true
-                    Task {
-                        do {
-                            try await syncViewModel.manager.performPairing()
-                            isPairing = false
-                            pairingError = nil
-                            showingPairingAlert = true
-                        } catch {
-                            isPairing = false
-                            pairingError = error.localizedDescription
-                            showingPairingAlert = true
-                        }
-                    }
+                    showQRScanner = true
                 }) {
                     HStack {
-                        if isPairing {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .tint(.white)
-                        } else {
-                            Image(systemName: "key.fill")
-                        }
-                        Text(isPairing ? "Pairing..." : "Pair Device")
+                        Image(systemName: "qrcode.viewfinder")
+                        Text("Pair Device")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(isPairing ? Color.blue.opacity(0.6) : Color.blue)
+                    .background(Color.blue)
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
-                .disabled(isPairing || syncViewModel.manager.pairingState == .pending)
-            } else {
-                // Show paired status
-                HStack {
-                    Image(systemName: "checkmark.shield.fill")
-                        .foregroundColor(.green)
-                    Text("Device Paired")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                    Spacer()
-                }
-                .padding(.vertical, 8)
             }
         }
     }

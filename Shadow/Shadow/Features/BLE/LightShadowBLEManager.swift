@@ -1,5 +1,5 @@
-import Foundation
-import CoreBluetooth
+@preconcurrency import Foundation
+@preconcurrency import CoreBluetooth
 import Combine
 
 /// BLE manager aligned to the ViewModel expectations:
@@ -39,7 +39,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private let resetOpcode: UInt8 = 0xFF
     private let resetMagic: UInt8 = 0x52
     private let connectThrottle: TimeInterval = 1.5
-    private let alwaysConnectOnChange = true
+    private let alwaysConnectOnChange = false  // Only connect when delta > 1
     
     // Persistence / repository
     private let repo = StressDataRepository.shared
@@ -73,17 +73,43 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     }
     
     // MARK: Public Interface
+    
+    /// Check if a Shadow device is paired
+    var isPairedToDevice: Bool {
+        UserDefaults.standard.string(forKey: "PairedShadowDevice") != nil
+    }
+    
+    /// Get paired device name
+    var pairedDeviceName: String? {
+        UserDefaults.standard.string(forKey: "PairedShadowDevice")
+    }
+    
+    /// Unpair current device
+    func unpairDevice() {
+        UserDefaults.standard.removeObject(forKey: "PairedShadowDevice")
+        stop()
+        log("Device unpaired")
+    }
+    
     func start() {
         guard central.state == .poweredOn else {
             log("Bluetooth not powered on")
             return
         }
+        
+        // Check if device is paired
+        guard isPairedToDevice else {
+            log("No paired device. Please scan QR code first.")
+            status = .idle
+            return
+        }
+        
         if isScanning { return }
         isScanning = true
         status = .scanning
         central.scanForPeripherals(withServices: nil,
                                    options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
-        log("Scanning...")
+        log("Scanning for \(pairedDeviceName ?? "unknown device")...")
     }
     
     func stop() {
@@ -124,6 +150,8 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     }
     
     private func applySimple(seq: UInt8, state: UInt8) {
+        let previousState = currentStableState
+        
         lastKnownSequence = seq
         currentStableState = state
         repo.updateDeviceState(deviceUUID: deviceUUID,
@@ -133,10 +161,29 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
                                epoch: nil)
         log("Applied simple delta=1 update locally")
         status = .upToDate
+        
+        // Send notification on stress state change
+        if previousState != state {
+            Task { @MainActor in
+                if state == 1 {
+                    // Stress detected
+                    NotificationManager.shared.sendStressAlert()
+                } else {
+                    // Stress recovered
+                    NotificationManager.shared.sendStressRecoveryNotification()
+                }
+            }
+        }
     }
     
     // MARK: Connection Flow
     private func connect(reset: Bool, peripheral: CBPeripheral) {
+        // Don't connect if already connected or connecting
+        if self.peripheral != nil && (status == .connecting || status == .requestingMissed) {
+            log("Already connected/connecting, ignoring")
+            return
+        }
+        
         guard Date().timeIntervalSince(lastConnectAttempt) > connectThrottle else {
             log("Connect throttled")
             return
@@ -248,6 +295,8 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
         }
         persistTransition(seq: curSeq, st: curState, reset: rc, note: "current")
         
+        let previousState = currentStableState
+        
         lastKnownSequence = curSeq
         currentStableState = curState
         repo.updateDeviceState(deviceUUID: deviceUUID,
@@ -258,6 +307,19 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
         log("Extended current=\(curSeq) missed=\(missed)")
         status = .upToDate
         disconnect()
+        
+        // Send notification on stress state change
+        if previousState != curState {
+            Task { @MainActor in
+                if curState == 1 {
+                    // Stress detected
+                    NotificationManager.shared.sendStressAlert()
+                } else {
+                    // Stress recovered
+                    NotificationManager.shared.sendStressRecoveryNotification()
+                }
+            }
+        }
     }
     
     private func persistTransition(seq: UInt8,
@@ -396,16 +458,19 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
     private func readCharacteristic(_ characteristic: CBCharacteristic, 
                                    from peripheral: CBPeripheral) async throws -> Data {
         return try await withCheckedThrowingContinuation { continuation in
-            var observer: NSObjectProtocol?
+            let observer = UnsafeMutablePointer<NSObjectProtocol?>.allocate(capacity: 1)
+            observer.initialize(to: nil)
             
-            observer = NotificationCenter.default.addObserver(
+            observer.pointee = NotificationCenter.default.addObserver(
                 forName: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
                 object: nil,
                 queue: .main
             ) { notification in
-                if let observer = observer {
-                    NotificationCenter.default.removeObserver(observer)
+                if let obs = observer.pointee {
+                    NotificationCenter.default.removeObserver(obs)
                 }
+                observer.deinitialize(count: 1)
+                observer.deallocate()
                 
                 if let error = notification.userInfo?["error"] as? Error {
                     continuation.resume(throwing: error)
@@ -420,8 +485,10 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
             
             // Timeout after 5 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                if let observer = observer {
-                    NotificationCenter.default.removeObserver(observer)
+                if let obs = observer.pointee {
+                    NotificationCenter.default.removeObserver(obs)
+                    observer.deinitialize(count: 1)
+                    observer.deallocate()
                     continuation.resume(throwing: PairingError.timeout)
                 }
             }
@@ -433,16 +500,19 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
                                     value: Data,
                                     to peripheral: CBPeripheral) async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            var observer: NSObjectProtocol?
+            let observer = UnsafeMutablePointer<NSObjectProtocol?>.allocate(capacity: 1)
+            observer.initialize(to: nil)
             
-            observer = NotificationCenter.default.addObserver(
+            observer.pointee = NotificationCenter.default.addObserver(
                 forName: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
                 object: nil,
                 queue: .main
             ) { notification in
-                if let observer = observer {
-                    NotificationCenter.default.removeObserver(observer)
+                if let obs = observer.pointee {
+                    NotificationCenter.default.removeObserver(obs)
                 }
+                observer.deinitialize(count: 1)
+                observer.deallocate()
                 
                 if let error = notification.userInfo?["error"] as? Error {
                     continuation.resume(throwing: error)
@@ -455,8 +525,10 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
             
             // Timeout after 5 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                if let observer = observer {
-                    NotificationCenter.default.removeObserver(observer)
+                if let obs = observer.pointee {
+                    NotificationCenter.default.removeObserver(obs)
+                    observer.deinitialize(count: 1)
+                    observer.deallocate()
                     continuation.resume(throwing: PairingError.timeout)
                 }
             }
@@ -466,208 +538,239 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
 
 // MARK: - CBCentralManagerDelegate
 extension LightShadowBLEManager: CBCentralManagerDelegate {
-    func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        switch central.state {
-        case .poweredOn:
-            log("Bluetooth ON")
-        case .poweredOff:
-            log("Bluetooth OFF")
-            status = .error
-        default:
-            break
+    nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        Task { @MainActor in
+            switch central.state {
+            case .poweredOn:
+                log("Bluetooth ON")
+            case .poweredOff:
+                log("Bluetooth OFF")
+                status = .error
+            default:
+                break
+            }
         }
     }
     
-    func centralManager(_ central: CBCentralManager,
+    nonisolated func centralManager(_ central: CBCentralManager,
                         didDiscover peripheral: CBPeripheral,
                         advertisementData: [String : Any],
                         rssi RSSI: NSNumber) {
-        guard peripheral.name == "Shadow" else { return }
-        guard let sd = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data],
-              let d = sd[serviceUUID] else { return }
-        handleAdv(peripheral: peripheral, data: d)
+        Task { @MainActor in
+            // Filter by paired device name (from QR code scan)
+            let pairedDevice = UserDefaults.standard.string(forKey: "PairedShadowDevice")
+            
+            // If no paired device, ignore all advertisements
+            guard let pairedDeviceName = pairedDevice else {
+                return
+            }
+            
+            // Only process advertisements from our paired device
+            guard peripheral.name == pairedDeviceName else { return }
+        
+            guard let sd = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data],
+                  let d = sd[serviceUUID] else { return }
+            handleAdv(peripheral: peripheral, data: d)
+        }
     }
     
-    func centralManager(_ central: CBCentralManager,
+    nonisolated func centralManager(_ central: CBCentralManager,
                         didConnect peripheral: CBPeripheral) {
-        log("Connected -> discover services")
-        peripheral.discoverServices([serviceUUID])
+        Task { @MainActor in
+            log("Connected -> discover services")
+            // Discover both stress service and pairing service
+            peripheral.discoverServices([serviceUUID, pairingServiceUUID])
+        }
     }
     
-    func centralManager(_ central: CBCentralManager,
+    nonisolated func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
-        log("Failed connect: \(error?.localizedDescription ?? "unknown")")
-        status = .error
-        self.peripheral = nil
+        Task { @MainActor in
+            log("Failed connect: \(error?.localizedDescription ?? "unknown")")
+            status = .error
+            self.peripheral = nil
+        }
     }
     
-    func centralManager(_ central: CBCentralManager,
+    nonisolated func centralManager(_ central: CBCentralManager,
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
-        log("Disconnected (err=\(error?.localizedDescription ?? "none"))")
-        eventChar = nil
-        self.peripheral = nil
-        if status != .error {
-            status = .scanning
+        Task { @MainActor in
+            log("Disconnected (err=\(error?.localizedDescription ?? "none"))")
+            eventChar = nil
+            self.peripheral = nil
+            if status != .error {
+                status = .scanning
+            }
         }
     }
 }
 
 // MARK: - CBPeripheralDelegate
 extension LightShadowBLEManager: CBPeripheralDelegate {
-    func peripheral(_ peripheral: CBPeripheral,
+    nonisolated func peripheral(_ peripheral: CBPeripheral,
                     didDiscoverServices error: Error?) {
-        if let error {
-            log("Service discovery error: \(error)")
-            status = .error
-            disconnect()
-            return
-        }
-        peripheral.services?.forEach {
-            if $0.uuid == serviceUUID {
-                peripheral.discoverCharacteristics([eventCharUUID], for: $0)
-            } else if $0.uuid == pairingServiceUUID {
-                // Discover all pairing characteristics
-                peripheral.discoverCharacteristics([
-                    deviceInfoCharUUID,
-                    pairingStateCharUUID,
-                    pairingControlCharUUID,
-                    securityChallengeCharUUID
-                ], for: $0)
-            }
-        }
-    }
-    
-    func peripheral(_ peripheral: CBPeripheral,
-                    didDiscoverCharacteristicsFor service: CBService,
-                    error: Error?) {
-        if let error {
-            log("Char discovery error: \(error)")
-            status = .error
-            disconnect()
-            return
-        }
-        service.characteristics?.forEach {
-            // Stress service characteristics
-            if $0.uuid == eventCharUUID {
-                eventChar = $0
-            }
-            // Pairing service characteristics
-            else if $0.uuid == deviceInfoCharUUID {
-                deviceInfoChar = $0
-                log("📋 Found Device Info characteristic")
-            }
-            else if $0.uuid == pairingStateCharUUID {
-                pairingStateChar = $0
-                // Subscribe to pairing state notifications
-                peripheral.setNotifyValue(true, for: $0)
-                log("🔔 Subscribed to Pairing State notifications")
-            }
-            else if $0.uuid == pairingControlCharUUID {
-                pairingControlChar = $0
-                log("📋 Found Pairing Control characteristic")
-            }
-            else if $0.uuid == securityChallengeCharUUID {
-                securityChallengeChar = $0
-                log("🔐 Found Security Challenge characteristic")
-            }
-        }
-        
-        // Original stress service logic
-        guard eventChar != nil else {
-            // If pairing characteristics found, that's okay - we're in pairing mode
-            if deviceInfoChar != nil {
-                log("Pairing service discovered, stress service not required yet")
+        Task { @MainActor in
+            if let error {
+                log("Service discovery error: \(error)")
+                status = .error
+                disconnect()
                 return
             }
-            log("Event characteristic missing")
-            status = .error
-            disconnect()
-            return
-        }
-        if pendingReset {
-            sendReset()
-        } else {
-            requestMissed()
+            peripheral.services?.forEach {
+                if $0.uuid == serviceUUID {
+                    peripheral.discoverCharacteristics([eventCharUUID], for: $0)
+                } else if $0.uuid == pairingServiceUUID {
+                    // Discover all pairing characteristics
+                    peripheral.discoverCharacteristics([
+                        deviceInfoCharUUID,
+                        pairingStateCharUUID,
+                        pairingControlCharUUID,
+                        securityChallengeCharUUID
+                    ], for: $0)
+                }
+            }
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral,
+    nonisolated func peripheral(_ peripheral: CBPeripheral,
+                    didDiscoverCharacteristicsFor service: CBService,
+                    error: Error?) {
+        Task { @MainActor in
+            if let error {
+                log("Char discovery error: \(error)")
+                status = .error
+                disconnect()
+                return
+            }
+            service.characteristics?.forEach {
+                // Stress service characteristics
+                if $0.uuid == eventCharUUID {
+                    eventChar = $0
+                    log("📡 Found Event characteristic (A002)")
+                }
+                // Pairing service characteristics
+                else if $0.uuid == deviceInfoCharUUID {
+                    deviceInfoChar = $0
+                    log("📋 Found Device Info characteristic")
+                }
+                else if $0.uuid == pairingStateCharUUID {
+                    pairingStateChar = $0
+                    // Subscribe to pairing state notifications
+                    peripheral.setNotifyValue(true, for: $0)
+                    log("🔔 Subscribed to Pairing State notifications")
+                }
+                else if $0.uuid == pairingControlCharUUID {
+                    pairingControlChar = $0
+                    log("📋 Found Pairing Control characteristic")
+                }
+                else if $0.uuid == securityChallengeCharUUID {
+                    securityChallengeChar = $0
+                    log("🔐 Found Security Challenge characteristic")
+                }
+            }
+            
+            // Original stress service logic - only proceed if stress service is discovered
+            if service.uuid == serviceUUID {
+                guard eventChar != nil else {
+                    log("Event characteristic missing from stress service")
+                    status = .error
+                    disconnect()
+                    return
+                }
+                if pendingReset {
+                    sendReset()
+                } else {
+                    requestMissed()
+                }
+            }
+            // For pairing service, just log that it's ready
+            if service.uuid == pairingServiceUUID {
+                log("✅ Pairing service characteristics discovered")
+            }
+        }
+    }
+    
+    nonisolated func peripheral(_ peripheral: CBPeripheral,
                     didWriteValueFor characteristic: CBCharacteristic,
                     error: Error?) {
-        if let error {
-            log("Write error: \(error.localizedDescription)")
-            // Post notification for async write failure
-            NotificationCenter.default.post(
-                name: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
-                object: nil,
-                userInfo: ["error": error]
-            )
-        } else {
-            log("Write OK")
-            // Post notification for async write success
-            NotificationCenter.default.post(
-                name: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
-                object: nil
-            )
+        Task { @MainActor in
+            if let error {
+                log("Write error: \(error.localizedDescription)")
+                // Post notification for async write failure
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
+                    object: nil,
+                    userInfo: ["error": error]
+                )
+            } else {
+                log("Write OK")
+                // Post notification for async write success
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("BLE.CharacteristicWrite.\(characteristic.uuid.uuidString)"),
+                    object: nil
+                )
+            }
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral,
+    nonisolated func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
-        if let error {
-            log("Read error: \(error.localizedDescription)")
-            status = .error
-            
-            // Post notification for async read failure
-            NotificationCenter.default.post(
-                name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
-                object: nil,
-                userInfo: ["error": error]
-            )
-            return
-        }
-        guard let data = characteristic.value else { return }
-        
-        // Handle pairing characteristics
-        if characteristic.uuid == pairingStateCharUUID {
-            if let stateInfo = PairingStateInfo(from: data) {
-                pairingState = stateInfo.state
-                log("🔐 Pairing state: \(stateInfo.state) (\(stateInfo.pairedCount)/\(stateInfo.maxPaired) paired)")
+        Task { @MainActor in
+            if let error {
+                log("Read error: \(error.localizedDescription)")
+                status = .error
+                
+                // Post notification for async read failure
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
+                    object: nil,
+                    userInfo: ["error": error]
+                )
+                return
             }
-            // Post notification for async read success
+            guard let data = characteristic.value else { return }
+            
+            // Handle pairing characteristics
+            if characteristic.uuid == pairingStateCharUUID {
+                if let stateInfo = PairingStateInfo(from: data) {
+                    pairingState = stateInfo.state
+                    log("🔐 Pairing state: \(stateInfo.state) (\(stateInfo.pairedCount)/\(stateInfo.maxPaired) paired)")
+                }
+                // Post notification for async read success
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
+                    object: nil,
+                    userInfo: ["data": data]
+                )
+                return
+            }
+            
+            // Post notification for async reads (device info, challenge, etc.)
             NotificationCenter.default.post(
                 name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
                 object: nil,
                 userInfo: ["data": data]
             )
-            return
-        }
-        
-        // Post notification for async reads (device info, challenge, etc.)
-        NotificationCenter.default.post(
-            name: NSNotification.Name("BLE.CharacteristicRead.\(characteristic.uuid.uuidString)"),
-            object: nil,
-            userInfo: ["data": data]
-        )
-        
-        // Original stress service logic continues below
-        if pendingReset {
-            if handleResetAck(data) {
-                disconnect()
-                return
-            } else {
-                log("Unexpected reset ACK format, continuing parse")
-                pendingReset = false
+            
+            // Original stress service logic continues below
+            if pendingReset {
+                if handleResetAck(data) {
+                    disconnect()
+                    return
+                } else {
+                    log("Unexpected reset ACK format, continuing parse")
+                    pendingReset = false
+                }
             }
-        }
-        switch data.count {
-        case 2: parseMinimal(data)
-        case 3...: parseExtended(data)
-        default:
-            log("Unknown response len=\(data.count)")
+            switch data.count {
+            case 2: parseMinimal(data)
+            case 3...: parseExtended(data)
+            default:
+                log("Unknown response len=\(data.count)")
+            }
         }
     }
 }
