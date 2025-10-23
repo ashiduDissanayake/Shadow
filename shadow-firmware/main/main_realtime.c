@@ -1269,6 +1269,8 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                         ESP_LOGI(TAG_MAIN, "⏳ Calibration already in progress (%.1f%% complete)",
                                  calibration_get_progress() * 100.0f);
                         ESP_LOGI(TAG_MAIN, "   Please wait - will auto-complete after collecting enough samples");
+                        // Show current progress on display
+                        display_show_calibration_progress(calibration_get_progress());
                     } else if (calibration_is_calibrated()) {
                         // Device already calibrated - require double-press to re-calibrate
                         if (recalibration_confirm_pending) {
@@ -1279,6 +1281,8 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                             recalibration_confirm_pending = false;
                             ESP_LOGI(TAG_MAIN, "🟢 Re-calibration started (2 minutes, auto-completes)");
                             ESP_LOGI(TAG_MAIN, "   ℹ️ Stay calm and still - will finish automatically");
+                            // Show calibration progress display
+                            display_show_calibration_progress(0.0f);
                         } else {
                             // First press - set confirmation flag
                             ESP_LOGI(TAG_MAIN, "⚠️ Device already calibrated");
@@ -1294,6 +1298,8 @@ static void enhanced_sensor_processing_task(void *pvParameters) {
                         calibration_start();
                         recalibration_confirm_pending = false;
                         ESP_LOGI(TAG_MAIN, "   ℹ️ Stay calm and still - will finish automatically");
+                        // Show calibration progress display
+                        display_show_calibration_progress(0.0f);
                     }
                     break;
                 
@@ -1855,6 +1861,18 @@ void app_main(void) {
     max_available = max30105_enhanced_init();
     mpu_available = mpu6050_init();
     gsr_available = gsr_adc_init();
+    
+    // Initialize battery monitoring with shared ADC handle (ADC1 is used by GSR)
+    if (gsr_available) {
+        ESP_LOGI(TAG_MAIN, "🔋 Initializing battery monitoring with shared ADC...");
+        if (battery_monitor_init_shared(adc_handle) == ESP_OK) {
+            ESP_LOGI(TAG_MAIN, "✅ Battery monitoring enabled");
+        } else {
+            ESP_LOGW(TAG_MAIN, "⚠️ Battery monitoring initialization failed");
+        }
+    } else {
+        ESP_LOGW(TAG_MAIN, "⚠️ GSR not available, battery monitoring disabled");
+    }
     
     ESP_LOGI(TAG_MAIN, "Real sensor status:");
     ESP_LOGI(TAG_MAIN, "  MAX30105 (BVP): %s", max_available ? "✓ ONLINE" : "✗ OFFLINE");

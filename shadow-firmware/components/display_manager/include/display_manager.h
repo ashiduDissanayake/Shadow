@@ -59,10 +59,13 @@ extern "C" {
  * Display modes
  */
 typedef enum {
-    DISPLAY_MODE_CLOCK,      // Show clock
-    DISPLAY_MODE_QR,         // Show QR code
-    DISPLAY_MODE_STATUS,     // Show status message
-    DISPLAY_MODE_OFF         // Screen off (power saving)
+    DISPLAY_MODE_CLOCK,          // Show clock
+    DISPLAY_MODE_QR,             // Show QR code
+    DISPLAY_MODE_STATUS,         // Show status message
+    DISPLAY_MODE_CONNECT_HOST,   // Show "Connect Host" message (no time sync)
+    DISPLAY_MODE_CALIBRATING,    // Show calibration progress
+    DISPLAY_MODE_GOOD_TO_GO,     // Show "Good to Go" after calibration
+    DISPLAY_MODE_OFF             // Screen off (power saving)
 } display_mode_t;
 
 /**
@@ -144,6 +147,53 @@ esp_err_t display_refresh(void);
  * @return Current display mode
  */
 display_mode_t display_get_mode(void);
+
+/**
+ * Show "Connect Host" message when time is not synced
+ * 
+ * @return ESP_OK on success
+ */
+esp_err_t display_show_connect_host(void);
+
+/**
+ * Show calibration progress with progress bar
+ * 
+ * @param progress Progress value (0.0 to 1.0)
+ * @return ESP_OK on success
+ */
+esp_err_t display_show_calibration_progress(float progress);
+
+/**
+ * Show "Good to Go" message after calibration completes
+ * 
+ * @return ESP_OK on success
+ */
+esp_err_t display_show_good_to_go(void);
+
+/**
+ * Initialize battery monitoring (ADC for battery voltage reading)
+ * Call this during display initialization
+ * 
+ * @return ESP_OK on success
+ */
+esp_err_t battery_monitor_init(void);
+
+/**
+ * Read battery voltage and calculate percentage
+ * 
+ * @param voltage_mv Output: battery voltage in millivolts (can be NULL)
+ * @return Battery percentage (0-100)
+ */
+int battery_get_percentage(uint16_t *voltage_mv);
+
+/**
+ * Initialize battery monitoring with a shared ADC handle
+ * Use this when ADC1 is already initialized by another component (e.g., GSR sensor)
+ * 
+ * @param adc_handle Existing ADC1 unit handle
+ * @return ESP_OK on success
+ */
+esp_err_t battery_monitor_init_shared(void *adc_handle);
 
 /**
  * DIRECT GPIO TEST - Uses TFT_eSPI approach (no esp_lcd)
