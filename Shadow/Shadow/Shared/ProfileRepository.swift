@@ -11,15 +11,12 @@ import Foundation
 
 class ProfileRepository {
     static let shared = ProfileRepository()
-    let container: NSPersistentContainer
+    
+    // Use shared persistence controller to avoid multiple NSManagedObjectModel instances
+    let container = PersistenceController.shared.container
 
     private init() {
-        container = NSPersistentContainer(name: "AppModel")
-        container.loadPersistentStores { _, error in
-            if let error = error {
-                fatalError("Core Data load failed: \(error)")
-            }
-        }
+        // No initialization needed - using shared controller
     }
 
     // Save profile

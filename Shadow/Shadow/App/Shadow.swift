@@ -32,18 +32,8 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
 struct Shadow: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    // Core Data container
-    let persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "AppModel")
-        container.loadPersistentStores { _, error in
-            if let error = error {
-                print("Core Data failed to load: \(error.localizedDescription)")
-            } else {
-                print("Core Data loaded successfully")
-            }
-        }
-        return container
-    }()
+    // Use shared persistence controller to avoid multiple NSManagedObjectModel instances
+    let persistentContainer = PersistenceController.shared.container
     
     var body: some Scene {
         WindowGroup {

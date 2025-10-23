@@ -222,18 +222,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
         // Always persist for timeline tracking (even if state unchanged)
         persistTransition(seq: seq, st: state, note: previousState != state ? "state-change" : "sequence-update")
         
-        // Send notification on stress state change
-        if previousState != state {
-            Task { @MainActor in
-                if state == 1 {
-                    // Stress detected
-                    NotificationManager.shared.sendStressAlert()
-                } else {
-                    // Stress recovered
-                    NotificationManager.shared.sendStressRecoveryNotification()
-                }
-            }
-        }
+        // Notifications now handled by NotificationDecisionEngine via SyncDashboardViewModel
     }
     
     // MARK: Connection Flow
@@ -412,18 +401,7 @@ final class LightShadowBLEManager: NSObject, ObservableObject {
         status = .upToDate
         disconnect()
         
-        // Send notification on stress state change
-        if previousState != curState {
-            Task { @MainActor in
-                if curState == 1 {
-                    // Stress detected
-                    NotificationManager.shared.sendStressAlert()
-                } else {
-                    // Stress recovered
-                    NotificationManager.shared.sendStressRecoveryNotification()
-                }
-            }
-        }
+        // Notifications now handled by NotificationDecisionEngine via SyncDashboardViewModel
     }
     
     private func persistTransition(seq: UInt8,

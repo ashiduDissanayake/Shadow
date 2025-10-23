@@ -10,14 +10,11 @@ final class StressDataRepository {
         return CoreDataReset.getOrCreateDefaultDeviceUUID()
     }()
     
-    private let container: NSPersistentContainer
+    // Use shared persistence controller to avoid multiple NSManagedObjectModel instances
+    private let container = PersistenceController.shared.container
     private var context: NSManagedObjectContext { container.viewContext }
     
     private init() {
-        container = NSPersistentContainer(name: "AppModel")
-        container.loadPersistentStores { _, error in
-            if let error { fatalError("Core Data load error: \(error)") }
-        }
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
     

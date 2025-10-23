@@ -99,6 +99,7 @@ final class SyncDashboardViewModel: ObservableObject {
                         print("🔄 [ViewModel] Triggered UI update with new UUID")
                         
                         // Evaluate via NotificationDecisionEngine (only once per event)
+                        print("➡️ [ViewModel] Passing event to NotificationDecisionEngine: seq=\(evt.sequenceNumber), state=\(evt.stressState)")
                         NotificationDecisionEngine.shared.evaluate(event: evt)
                     }
                 } else {

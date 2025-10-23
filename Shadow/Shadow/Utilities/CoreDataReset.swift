@@ -13,7 +13,8 @@ class CoreDataReset {
     
     /// Completely delete all Core Data stores and reset to fresh state
     static func deleteAllCoreDataStores() {
-        let container = NSPersistentContainer(name: "AppModel")
+        // Use shared controller to avoid creating new container
+        let container = PersistenceController.shared.container
         
         // Get all store descriptions
         for storeDescription in container.persistentStoreDescriptions {
@@ -52,28 +53,22 @@ class CoreDataReset {
     
     /// Delete all data but keep the store structure
     static func deleteAllData() {
-        let container = NSPersistentContainer(name: "AppModel")
-        container.loadPersistentStores { _, error in
-            if let error = error {
-                print("❌ Failed to load stores for deletion: \(error)")
-                return
-            }
-            
-            let context = container.viewContext
-            
-            // Delete all entities in correct order (relationships first)
-            deleteAllEntities(ofType: "StressEvent", in: context)
-            deleteAllEntities(ofType: "Event", in: context)
-            deleteAllEntities(ofType: "ShadowDevice", in: context)
-            deleteAllEntities(ofType: "UserProfile", in: context)
-            
-            // Save changes
-            do {
-                try context.save()
-                print("✅ All Core Data entries deleted successfully")
-            } catch {
-                print("❌ Error saving after deletion: \(error)")
-            }
+        // Use shared controller to avoid creating new container
+        let container = PersistenceController.shared.container
+        let context = container.viewContext
+        
+        // Delete all entities in correct order (relationships first)
+        deleteAllEntities(ofType: "StressEvent", in: context)
+        deleteAllEntities(ofType: "Event", in: context)
+        deleteAllEntities(ofType: "ShadowDevice", in: context)
+        deleteAllEntities(ofType: "UserProfile", in: context)
+        
+        // Save changes
+        do {
+            try context.save()
+            print("✅ All Core Data entries deleted successfully")
+        } catch {
+            print("❌ Error saving after deletion: \(error)")
         }
         
         // Clear UserDefaults for device tracking

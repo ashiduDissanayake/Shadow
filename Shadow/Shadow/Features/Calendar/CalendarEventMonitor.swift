@@ -22,7 +22,46 @@ class CalendarEventMonitor: ObservableObject {
     // Track notified events to prevent duplicates
     private var notifiedEvents = Set<UUID>()
     
-    private init() {}
+    // Observe CoreData changes for immediate event detection
+    private var eventsObserver: NSObjectProtocol?
+    
+    private init() {
+        // Set up CoreData notification observer for new/updated events
+        setupEventObserver()
+    }
+    
+    deinit {
+        if let observer = eventsObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+    
+    // MARK: - Event Observer
+    
+    /// Set up observer for CoreData changes to Event entity
+    private func setupEventObserver() {
+        eventsObserver = NotificationCenter.default.addObserver(
+            forName: NSManagedObjectContext.didSaveObjectsNotification,
+            object: PersistenceController.shared.viewContext,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self else { return }
+            
+            // Check if any Event entities were inserted or updated
+            let insertedObjects = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+            let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+            
+            let hasEventChanges = insertedObjects.contains { $0 is Event } || 
+                                 updatedObjects.contains { $0 is Event }
+            
+            if hasEventChanges {
+                print("📅 [CalendarMonitor] Event change detected - checking immediately")
+                Task { @MainActor in
+                    await self.checkUpcomingEvents()
+                }
+            }
+        }
+    }
     
     // MARK: - Monitoring
     
@@ -30,8 +69,8 @@ class CalendarEventMonitor: ObservableObject {
     func startMonitoring() {
         print("📅 [CalendarMonitor] Starting event monitoring...")
         
-        // Check every 30 seconds for upcoming events
-        timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        // Check every 5 minutes for upcoming events (aligned with notification cooldown)
+        timer = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 await self?.checkUpcomingEvents()
             }
@@ -50,10 +89,18 @@ class CalendarEventMonitor: ObservableObject {
         timer = nil
     }
     
+    /// Manually trigger event check (useful for testing or when user adds event)
+    func checkNow() {
+        print("📅 [CalendarMonitor] Manual check triggered")
+        Task { @MainActor in
+            await checkUpcomingEvents()
+        }
+    }
+    
     // MARK: - Event Checking
     
     private func checkUpcomingEvents() async {
-        // Get all events from CoreData (your existing Event model)
+        // Get all events from CoreData
         let allEvents = EventRepository.shared.fetchAllUpcomingEvents(withinHours: 1)
         
         guard !allEvents.isEmpty else {
@@ -62,12 +109,17 @@ class CalendarEventMonitor: ObservableObject {
         
         print("📅 [CalendarMonitor] Found \(allEvents.count) upcoming events in next hour")
         
-        // Get current stress state
-        let currentStressState = getCurrentStressState()
+        // Get current stress state from recent StressEvents
+        let recentEvents = stressRepo.recentEvents(limit: 1)
+        let currentStressState = recentEvents.first?.stressState ?? 0
         
-        for event in allEvents {
-            await processEvent(event, stressState: currentStressState)
-        }
+        print("📅 [CalendarMonitor] Current stress state: \(currentStressState)")
+        
+        // Pass to NotificationDecisionEngine for intelligent handling
+        NotificationDecisionEngine.shared.checkCalendarEvents(
+            events: allEvents,
+            currentStressState: Int(currentStressState)
+        )
     }
     
     private func processEvent(_ event: Event, stressState: StressState) async {
