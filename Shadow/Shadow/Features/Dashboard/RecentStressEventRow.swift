@@ -15,7 +15,7 @@ struct RecentStressEventRow: View {
                 HStack {
                     Text("Seq: \(event.sequenceNumber)")
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(.shadowTextSecondary)
                     
                     Spacer()
                     
@@ -27,7 +27,7 @@ struct RecentStressEventRow: View {
                 
                 Text(timeAgo(event.timestamp ?? Date()))
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.shadowTextTertiary)
             }
             
             Spacer()
@@ -35,12 +35,12 @@ struct RecentStressEventRow: View {
             if event.confidenceScore > 0 {
                 Text("\(Int(event.confidenceScore * 100))%")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.shadowTextPrimary)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(.black.opacity(0.3))
+                            .fill(Color.shadowBackgroundSecondary)
                     )
             }
         }
@@ -48,15 +48,15 @@ struct RecentStressEventRow: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(.black.opacity(0.2))
+                .fill(Color.shadowBackgroundSecondary.opacity(0.8))
         )
     }
     
     private var stateColor: Color {
         switch event.stressState {
-        case 0: return .green
-        case 1: return .red
-        default: return .gray
+        case 0: return .shadowSuccess
+        case 1: return .shadowStressHigh
+        default: return .shadowTextTertiary
         }
     }
     

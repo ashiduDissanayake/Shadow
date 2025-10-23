@@ -20,15 +20,16 @@ struct FeaturePill: View {
                 .foregroundColor(color)
             Text(text)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(.shadowTextPrimary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.1))
+        .background(Color.shadowSurface.opacity(0.9))
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                .stroke(color.opacity(0.3), lineWidth: 1)
         )
+        .shadow(color: Color.shadowElevation1, radius: 4, x: 0, y: 2)
     }
 }

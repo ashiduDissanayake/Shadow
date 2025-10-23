@@ -27,7 +27,7 @@ struct EventRowView: View {
                     HStack(spacing: 12) {
                         Text(event.title ?? "Untitled Event")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.shadowTextPrimary)
                             .lineLimit(2)
 
                         Spacer()
@@ -42,7 +42,7 @@ struct EventRowView: View {
                     if let notes = event.notes, !notes.isEmpty {
                         Text(notes)
                             .font(.system(size: 13, weight: .regular))
-                            .foregroundColor(.white.opacity(0.65))
+                            .foregroundColor(.shadowTextSecondary)
                             .lineLimit(isHovered ? 3 : 2)
                             .padding(.top, 4)
                             .animation(.easeInOut(duration: 0.2), value: isHovered)
@@ -52,16 +52,16 @@ struct EventRowView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "star.fill")
                                 .font(.system(size: 10))
-                                .foregroundColor(.yellow)
+                                .foregroundColor(.shadowAccent)
                             Text(custom)
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.yellow)
+                                .foregroundColor(.shadowAccent)
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(.yellow.opacity(0.15))
+                                .fill(Color.shadowAccentLight.opacity(0.5))
                         )
                     }
                 }
@@ -97,9 +97,9 @@ struct EventRowView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(isHovered ? .white.opacity(0.14) : .white.opacity(0.08))
-                .stroke(isHovered ? .white.opacity(0.25) : .white.opacity(0.12), lineWidth: 1)
-                .shadow(color: isHovered ? .black.opacity(0.25) : .clear, radius: isHovered ? 15 : 0, x: 0, y: isHovered ? 8 : 0)
+                .fill(isHovered ? Color.shadowBackgroundSecondary : Color.shadowSurface.opacity(0.6))
+                .stroke(isHovered ? Color.shadowBorder : Color.shadowBorderLight, lineWidth: 1)
+                .shadow(color: isHovered ? Color.shadowElevation2 : Color.clear, radius: isHovered ? 8 : 0, x: 0, y: isHovered ? 4 : 0)
         )
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .onHover { hovering in
@@ -125,18 +125,18 @@ struct EventRowView: View {
     private var deleteButtonColors: [Color] {
 #if os(macOS)
         // On macOS, use subtle styling when not hovered, prominent when hovered
-        isHovered ? [.red.opacity(0.92), .red.opacity(0.68)] : [.white.opacity(0.15), .white.opacity(0.08)]
+        isHovered ? [Color.shadowError, Color.shadowError.opacity(0.7)] : [Color.shadowTextTertiary.opacity(0.3), Color.shadowTextTertiary.opacity(0.2)]
 #else
         // On iOS/touchOS, always use visible but subtle styling
-        [.red.opacity(0.75), .red.opacity(0.55)]
+        [Color.shadowError.opacity(0.8), Color.shadowError.opacity(0.6)]
 #endif
     }
     
     private var deleteButtonShadowColor: Color {
 #if os(macOS)
-        isHovered ? .red.opacity(0.3) : .clear
+        isHovered ? Color.shadowError.opacity(0.3) : .clear
 #else
-        .red.opacity(0.2)
+        Color.shadowError.opacity(0.2)
 #endif
     }
     
@@ -163,13 +163,13 @@ struct EventRowView: View {
             Text(event.eventType ?? "Work")
                 .font(.system(size: 8, weight: .medium))
         }
-        .foregroundColor(.white.opacity(0.85))
+        .foregroundColor(.shadowTextSecondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(.white.opacity(0.12))
-                .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                .fill(Color.shadowBackgroundSecondary)
+                .stroke(Color.shadowBorder, lineWidth: 0.5)
         )
     }
 
@@ -177,14 +177,14 @@ struct EventRowView: View {
         HStack(spacing: 6) {
             Image(systemName: "clock.fill")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.blue.opacity(0.8))
+                .foregroundColor(.shadowPrimary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.date ?? Date(), style: .time)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(.shadowTextPrimary)
                 Text(event.date ?? Date(), style: .date)
                     .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.shadowTextSecondary)
             }
         }
     }
@@ -193,23 +193,23 @@ struct EventRowView: View {
         HStack(spacing: 6) {
             Image(systemName: "hourglass")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.purple.opacity(0.8))
+                .foregroundColor(.shadowAccent)
             Text(formatDuration(event.duration))
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.shadowTextPrimary)
         }
     }
 
     private func colorForEventType(_ type: String) -> [Color] {
         switch type {
         case "Work":
-            return [.blue.opacity(0.85), .blue.opacity(0.65)]
+            return [.shadowPrimary, .shadowPrimaryLight]
         case "Birthday":
-            return [.pink.opacity(0.85), .red.opacity(0.65)]
+            return [.shadowSecondary, .shadowSecondaryLight]
         case "Custom":
-            return [.yellow.opacity(0.85), .orange.opacity(0.65)]
+            return [.shadowAccent, .shadowAccentLight]
         default:
-            return [.gray.opacity(0.8), .gray.opacity(0.6)]
+            return [.shadowTextTertiary, .shadowTextTertiary.opacity(0.6)]
         }
     }
 

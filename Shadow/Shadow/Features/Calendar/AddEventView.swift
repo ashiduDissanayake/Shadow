@@ -178,7 +178,7 @@ struct AddEventView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(
-                                        titleFocused ? Color.accentColor.opacity(0.6) : Color.secondary.opacity(0.2),
+                                        titleFocused ? Color.shadowPrimary.opacity(0.6) : Color.secondary.opacity(0.2),
                                         lineWidth: titleFocused ? 1.5 : 0.5
                                     )
                             )
@@ -187,7 +187,7 @@ struct AddEventView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .strokeBorder(
-                                titleFocused ? Color.accentColor.opacity(0.2) : .clear,
+                                titleFocused ? Color.shadowPrimary.opacity(0.2) : .clear,
                                 lineWidth: 3
                             )
                     )
@@ -322,7 +322,7 @@ struct AddEventView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.shadowPrimary)
                 .symbolRenderingMode(.hierarchical)
 
             Text(title)
@@ -390,11 +390,11 @@ struct AddEventView: View {
                 .padding(.horizontal, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(duration == value ? Color.accentColor : Color(NSColor.windowBackgroundColor))
+                        .fill(duration == value ? Color.shadowPrimary : Color(NSColor.windowBackgroundColor))
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
                                 .stroke(
-                                    duration == value ? Color.accentColor.opacity(0.6) : Color.secondary.opacity(0.2),
+                                    duration == value ? Color.shadowPrimary.opacity(0.6) : Color.secondary.opacity(0.2),
                                     lineWidth: duration == value ? 1.5 : 0.5
                                 )
                         )
@@ -402,11 +402,11 @@ struct AddEventView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(
-                            duration == value ? Color.accentColor.opacity(0.3) : .clear,
+                            duration == value ? Color.shadowPrimary.opacity(0.3) : .clear,
                             lineWidth: 2
                         )
                 )
-                .shadow(color: duration == value ? Color.accentColor.opacity(0.3) : .clear, radius: 6, x: 0, y: 2)
+                .shadow(color: duration == value ? Color.shadowPrimary.opacity(0.3) : .clear, radius: 6, x: 0, y: 2)
         }
         .buttonStyle(.borderless)
         .scaleEffect(duration == value ? 1.02 : 1.0)
@@ -423,10 +423,10 @@ struct AddEventView: View {
 
     private func colorForEventType(_ type: String) -> Color {
         switch type {
-        case "Work": return .blue
-        case "Birthday": return .pink
-        case "Custom": return .orange
-        default: return .gray
+        case "Work": return .shadowPrimary
+        case "Birthday": return .shadowSecondary
+        case "Custom": return .shadowAccent
+        default: return .shadowTextTertiary
         }
     }
 
@@ -464,7 +464,7 @@ struct PrimaryButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(
                         isEnabled
-                        ? (isHovered ? Color.accentColor.opacity(0.9) : Color.accentColor)
+                        ? (isHovered ? Color.shadowPrimary.opacity(0.9) : Color.shadowPrimary)
                         : Color.secondary.opacity(0.2)
                     )
             )
@@ -476,7 +476,7 @@ struct PrimaryButtonStyle: ButtonStyle {
                     )
             )
             .shadow(
-                color: isEnabled ? Color.accentColor.opacity(0.4) : .clear,
+                color: isEnabled ? Color.shadowPrimary.opacity(0.4) : .clear,
                 radius: isHovered ? 8 : 4,
                 x: 0,
                 y: 2

@@ -10,16 +10,8 @@ struct CalendarMainView: View {
     var body: some View {
         ZStack {
             // The background (gradient)
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.02, green: 0.05, blue: 0.12),
-                    Color(red: 0.08, green: 0.12, blue: 0.22),
-                    Color(red: 0.05, green: 0.08, blue: 0.18)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            Color.shadowWellnessGradient()
+                .ignoresSafeArea()
 
             if showingCalendar {
                 // Dismissal overlay - covers entire background
@@ -59,8 +51,8 @@ struct CalendarMainView: View {
                 .frame(maxWidth: 1100, maxHeight: 800)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.3)
+                        .fill(Color.shadowSurface.opacity(0.95))
+                        .shadow(color: Color.shadowElevation3, radius: 30, x: 0, y: 10)
                 )
                 .background(
                     // Invisible tap blocker
@@ -97,12 +89,12 @@ struct CalendarMainView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .medium))
                 }
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundColor(.shadowPrimary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.10))
+                        .fill(Color.shadowBackgroundSecondary)
                 )
             }
             .buttonStyle(.borderless)
@@ -111,29 +103,17 @@ struct CalendarMainView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Calendar")
                     .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white, .white.opacity(0.85)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .foregroundColor(.shadowTextPrimary)
                 
                 if let user = viewModel.profile {
                     HStack(spacing: 10) {
                         Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.blue.opacity(0.8), .purple.opacity(0.6)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(Color.shadowPrimaryGradient())
                             .frame(width: 8, height: 8)
                         
                         Text("Welcome back, \(user.name ?? "User")")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(.shadowTextSecondary)
                     }
                 }
             }
@@ -154,18 +134,9 @@ struct CalendarMainView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.blue.opacity(0.85),
-                            Color.purple.opacity(0.75)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .background(Color.shadowPrimaryGradient())
                 .clipShape(Capsule())
-                .shadow(color: .blue.opacity(0.4), radius: 10, x: 0, y: 5)
+                .shadow(color: Color.shadowPrimary.opacity(0.4), radius: 10, x: 0, y: 5)
             }
             .buttonStyle(.borderless)
             .scaleEffect(showingAddEvent ? 0.95 : 1.0)
@@ -182,7 +153,7 @@ struct CalendarMainView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Event Types")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
                 
                 VStack(spacing: 6) {
                     ForEach(eventTypes, id: \.self) { type in
@@ -199,9 +170,9 @@ struct CalendarMainView: View {
         .padding(24)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.white.opacity(0.08))
-                .stroke(.white.opacity(0.15), lineWidth: 1)
-                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                .fill(Color.shadowBackgroundSecondary)
+                .stroke(Color.shadowBorder, lineWidth: 1)
+                .shadow(color: Color.shadowElevation2, radius: 10, x: 0, y: 4)
         )
     }
     
@@ -212,10 +183,10 @@ struct CalendarMainView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Events")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.shadowTextPrimary)
                     Text(viewModel.selectedDate, formatter: dayFormatter)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.shadowTextSecondary)
                 }
                 Spacer()
                 let eventCount = viewModel.filteredEvents.count
@@ -227,7 +198,7 @@ struct CalendarMainView: View {
                         .padding(.vertical, 6)
                         .background(
                             Capsule()
-                                .fill(.blue.opacity(0.7))
+                                .fill(Color.shadowPrimary)
                         )
                 }
             }
@@ -236,7 +207,7 @@ struct CalendarMainView: View {
             .padding(.bottom, 16)
 
             Divider()
-                .background(.white.opacity(0.2))
+                .background(Color.shadowBorder)
                 .padding(.horizontal, 20)
 
             // Events scroll view
@@ -246,14 +217,14 @@ struct CalendarMainView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 28))
-                                .foregroundColor(.white.opacity(0.4))
+                                .foregroundColor(.shadowTextTertiary)
                             VStack(spacing: 6) {
                                 Text("No events scheduled")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.6))
+                                    .foregroundColor(.shadowTextSecondary)
                                 Text("for this day")
                                     .font(.system(size: 14, weight: .regular))
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .foregroundColor(.shadowTextTertiary)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -276,9 +247,9 @@ struct CalendarMainView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.white.opacity(0.08))
-                .stroke(.white.opacity(0.15), lineWidth: 1)
-                .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 8)
+                .fill(Color.shadowBackgroundSecondary)
+                .stroke(Color.shadowBorder, lineWidth: 1)
+                .shadow(color: Color.shadowElevation2, radius: 10, x: 0, y: 4)
         )
     }
 
@@ -297,18 +268,18 @@ struct CalendarMainView: View {
             HStack(spacing: 12) {
                 Image(systemName: iconForEventType(type))
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(viewModel.selectedEventType == type ? .white : .white.opacity(0.6))
+                    .foregroundColor(viewModel.selectedEventType == type ? .shadowPrimary : .shadowTextSecondary)
                     .frame(width: 20)
                 
                 Text(type)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(viewModel.selectedEventType == type ? .white : .white.opacity(0.7))
+                    .foregroundColor(viewModel.selectedEventType == type ? .shadowTextPrimary : .shadowTextSecondary)
                 
                 Spacer()
                 
                 if viewModel.selectedEventType == type {
                     Circle()
-                        .fill(.blue)
+                        .fill(Color.shadowPrimary)
                         .frame(width: 6, height: 6)
                 }
             }
@@ -316,8 +287,8 @@ struct CalendarMainView: View {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(viewModel.selectedEventType == type ? .white.opacity(0.12) : Color.clear)
-                    .stroke(viewModel.selectedEventType == type ? .white.opacity(0.25) : Color.clear, lineWidth: 1)
+                    .fill(viewModel.selectedEventType == type ? Color.shadowPrimaryLight.opacity(0.2) : Color.clear)
+                    .stroke(viewModel.selectedEventType == type ? Color.shadowPrimary.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.borderless)
@@ -337,34 +308,34 @@ struct CalendarMainView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Today's Overview")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.shadowTextPrimary)
             
             VStack(spacing: 12) {
                 HStack {
                     Text("Events today")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.shadowTextSecondary)
                     Spacer()
                     Text("\(todaysEventCount)")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.blue)
+                        .foregroundColor(.shadowPrimary)
                 }
                 
                 HStack {
                     Text("This week")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.shadowTextSecondary)
                     Spacer()
                     Text("\(thisWeekEventCount)")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.purple)
+                        .foregroundColor(.shadowAccent)
                 }
             }
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.white.opacity(0.06))
-                    .stroke(.white.opacity(0.12), lineWidth: 1)
+                    .fill(Color.shadowSurface)
+                    .stroke(Color.shadowBorder, lineWidth: 1)
             )
         }
     }

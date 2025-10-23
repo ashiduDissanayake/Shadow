@@ -63,13 +63,13 @@ struct CustomCalendarView: View {
                         Text("Back")
                             .font(.system(size: 15, weight: .medium))
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(.shadowPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(.blue.opacity(0.1))
-                            .stroke(.blue.opacity(0.2), lineWidth: 1)
+                            .fill(Color.shadowPrimaryLight.opacity(0.2))
+                            .stroke(Color.shadowPrimary.opacity(0.3), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.borderless)
@@ -87,13 +87,13 @@ struct CustomCalendarView: View {
             }) {
                 Text("Today")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.shadowTextSecondary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(.white.opacity(0.1))
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .fill(Color.shadowBackgroundSecondary)
+                            .stroke(Color.shadowBorder, lineWidth: 1)
                     )
             }
             .buttonStyle(.borderless)
@@ -107,12 +107,12 @@ struct CustomCalendarView: View {
             Button(action: previousMonth) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
                     .frame(width: 40, height: 40)
                     .background(
                         Circle()
-                            .fill(.white.opacity(0.1))
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .fill(Color.shadowBackgroundSecondary)
+                            .stroke(Color.shadowBorder, lineWidth: 1)
                     )
             }
             .buttonStyle(.borderless)
@@ -123,7 +123,7 @@ struct CustomCalendarView: View {
 
             Text(monthYearString)
                 .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(.shadowTextPrimary)
                 .animation(.none, value: currentMonth)
 
             Spacer()
@@ -131,12 +131,12 @@ struct CustomCalendarView: View {
             Button(action: nextMonth) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
                     .frame(width: 40, height: 40)
                     .background(
                         Circle()
-                            .fill(.white.opacity(0.1))
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .fill(Color.shadowBackgroundSecondary)
+                            .stroke(Color.shadowBorder, lineWidth: 1)
                     )
             }
             .buttonStyle(.borderless)
@@ -152,15 +152,15 @@ struct CustomCalendarView: View {
             ForEach(calendar.shortWeekdaySymbols, id: \.self) { weekday in
                 Text(weekday.uppercased())
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.shadowTextSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
             }
         }
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(.white.opacity(0.08))
-                .stroke(.white.opacity(0.15), lineWidth: 1)
+                .fill(Color.shadowBackgroundSecondary.opacity(0.6))
+                .stroke(Color.shadowBorder, lineWidth: 1)
         )
     }
     
@@ -190,8 +190,8 @@ struct CustomCalendarView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(.white.opacity(0.05))
-                .stroke(.white.opacity(0.1), lineWidth: 1)
+                .fill(Color.shadowSurface.opacity(0.5))
+                .stroke(Color.shadowBorder, lineWidth: 1)
         )
     }
     
@@ -204,11 +204,11 @@ struct CustomCalendarView: View {
                     Text("Events")
                         .font(.title2)
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
+                        .foregroundColor(.shadowTextPrimary)
                     
                     Text(selectedDate, formatter: dayFormatter)
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.shadowTextSecondary)
                 }
                 
                 Spacer()
@@ -224,7 +224,7 @@ struct CustomCalendarView: View {
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(.blue.opacity(0.6))
+                                .fill(Color.shadowPrimary)
                         )
                 }
             }
@@ -233,7 +233,7 @@ struct CustomCalendarView: View {
             .padding(.bottom, 12)
             
             Divider()
-                .background(.white.opacity(0.2))
+                .background(Color.shadowBorder)
             
             // Events List
             ScrollView {
@@ -244,11 +244,11 @@ struct CustomCalendarView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 24))
-                                .foregroundColor(.white.opacity(0.4))
+                                .foregroundColor(.shadowTextTertiary)
                             
                             Text("No events scheduled")
                                 .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(.shadowTextSecondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 32)
@@ -268,8 +268,8 @@ struct CustomCalendarView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(.white.opacity(0.05))
-                .stroke(.white.opacity(0.1), lineWidth: 1)
+                .fill(Color.shadowBackgroundSecondary)
+                .stroke(Color.shadowBorder, lineWidth: 1)
         )
     }
 
@@ -387,27 +387,21 @@ struct CalendarDayView: View {
         if isSelected {
             return .white
         } else if isToday {
-            return .blue
+            return .shadowPrimary
         } else {
-            return .white.opacity(0.9)
+            return .shadowTextPrimary
         }
     }
     
     private var dayBackgroundColor: some ShapeStyle {
         if isSelected {
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [.blue.opacity(0.9), .purple.opacity(0.7)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            return AnyShapeStyle(Color.shadowPrimaryGradient())
         } else if isToday {
-            return AnyShapeStyle(Color.blue.opacity(0.2))
+            return AnyShapeStyle(Color.shadowPrimaryLight.opacity(0.3))
         } else if isHovered {
-            return AnyShapeStyle(Color.white.opacity(0.15))
+            return AnyShapeStyle(Color.shadowBackgroundSecondary)
         } else if !events.isEmpty {
-            return AnyShapeStyle(Color.white.opacity(0.08))
+            return AnyShapeStyle(Color.shadowBackgroundSecondary.opacity(0.5))
         } else {
             return AnyShapeStyle(Color.clear)
         }
@@ -415,13 +409,13 @@ struct CalendarDayView: View {
     
     private var dayBorderColor: Color {
         if isSelected {
-            return .blue.opacity(0.6)
+            return .shadowPrimary.opacity(0.6)
         } else if isToday {
-            return .blue.opacity(0.8)
+            return .shadowPrimary
         } else if !events.isEmpty {
-            return .white.opacity(0.25)
+            return .shadowBorder
         } else {
-            return .white.opacity(0.12)
+            return .shadowBorderLight
         }
     }
     
@@ -437,7 +431,7 @@ struct CalendarDayView: View {
     
     private var shadowColor: Color {
         if isSelected {
-            return .blue.opacity(0.4)
+            return .shadowPrimary.opacity(0.4)
         } else {
             return Color.clear
         }
@@ -453,10 +447,10 @@ struct CalendarDayView: View {
     
     private func colorForEventType(_ type: String) -> Color {
         switch type {
-        case "Work": return .blue
-        case "Birthday": return .pink
-        case "Custom": return .yellow
-        default: return .gray
+        case "Work": return .shadowPrimary
+        case "Birthday": return .shadowSecondary
+        case "Custom": return .shadowAccent
+        default: return .shadowTextTertiary
         }
     }
 }

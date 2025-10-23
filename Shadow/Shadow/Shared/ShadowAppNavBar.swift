@@ -19,11 +19,11 @@ struct ShadowAppNavBar: View {
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
                 
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.shadowTextSecondary)
             }
             
             Spacer()
@@ -31,7 +31,7 @@ struct ShadowAppNavBar: View {
             // Calendar button
             Button(action: onCalendarTap) {
                 Image(systemName: "calendar")
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowPrimary)
                     .font(.title2)
             }
             .padding(.leading, 8)
@@ -41,11 +41,7 @@ struct ShadowAppNavBar: View {
                 Button(action: onProfileTap) {
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [.blue, .purple]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
+                            .fill(Color.shadowPrimaryGradient())
                             .frame(width: 32, height: 32)
                             .overlay(
                                 Text(profile.name?.prefix(1).uppercased() ?? "U")
@@ -57,7 +53,7 @@ struct ShadowAppNavBar: View {
                         Text(profile.name ?? "User")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(.white)
+                            .foregroundColor(.shadowTextPrimary)
                     }
                 }
                 .padding(.leading, 8)
@@ -65,32 +61,24 @@ struct ShadowAppNavBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.1, green: 0.15, blue: 0.25),
-                    Color(red: 0.05, green: 0.08, blue: 0.15)
-                ]),
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
+        .background(Color.shadowSurface)
+        .shadow(color: Color.shadowElevation1, radius: 4, x: 0, y: 2)
     }
     
     @ViewBuilder
     private var bleStatusIcon: some View {
         if syncViewModel.isActive {
             Image(systemName: "bluetooth")
-                .foregroundColor(.orange)
+                .foregroundColor(.shadowWarning)
                 .font(.caption)
                 .symbolEffect(.pulse, options: .repeating)
         } else if syncViewModel.stateText == "Up to Date" {
             Image(systemName: "bluetooth.fill")
-                .foregroundColor(.green)
+                .foregroundColor(.shadowSuccess)
                 .font(.caption)
         } else {
             Image(systemName: "bluetooth.slash")
-                .foregroundColor(.gray)
+                .foregroundColor(.shadowTextTertiary)
                 .font(.caption)
         }
     }
@@ -101,11 +89,11 @@ struct ShadowAppNavBar: View {
     
     private var bleStatusColor: Color {
         if syncViewModel.isActive {
-            return .orange
+            return .shadowWarning
         } else if syncViewModel.stateText == "Up to Date" {
-            return .green
+            return .shadowSuccess
         } else {
-            return .gray
+            return .shadowTextTertiary
         }
     }
 }
@@ -119,28 +107,31 @@ struct ShadowBLEPopoverView: View {
             HStack {
                 Image(systemName: "brain.head.profile")
                     .font(.title2)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.shadowPrimary)
                 
                 VStack(alignment: .leading) {
                     Text("Shadow Monitor")
                         .font(.headline)
                         .fontWeight(.semibold)
+                        .foregroundColor(.shadowTextPrimary)
                     
                     Text("TinyML Stress Detection")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.shadowTextSecondary)
                 }
                 
                 Spacer()
             }
             
             Divider()
+                .background(Color.shadowBorder)
             
             // Status section
             VStack(alignment: .leading, spacing: 8) {
                 Label("System Status", systemImage: "info.circle")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.shadowTextPrimary)
                 
                 Text(syncViewModel.stateText)
                     .font(.body)
@@ -153,22 +144,25 @@ struct ShadowBLEPopoverView: View {
                 Label("Sync Info", systemImage: "arrow.clockwise")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.shadowTextPrimary)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("Last Sync:")
+                            .foregroundColor(.shadowTextSecondary)
                         Spacer()
                         Text(syncViewModel.lastSync)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.shadowTextSecondary)
                     }
                     
                     HStack {
                         Text("Sequence:")
+                            .foregroundColor(.shadowTextSecondary)
                         Spacer()
                         Text(syncViewModel.sequenceStatus)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.shadowTextSecondary)
                     }
                 }
                 .padding(.leading, 20)
@@ -179,13 +173,16 @@ struct ShadowBLEPopoverView: View {
                 Label("Statistics", systemImage: "chart.bar")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.shadowTextPrimary)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("Events Received:")
+                            .foregroundColor(.shadowTextSecondary)
                         Spacer()
                         Text("\(syncViewModel.eventsReceived)")
                             .fontWeight(.medium)
+                            .foregroundColor(.shadowTextPrimary)
                     }
                 }
                 .font(.caption)
@@ -193,6 +190,7 @@ struct ShadowBLEPopoverView: View {
             }
             
             Divider()
+                .background(Color.shadowBorder)
             
             // Control buttons
             HStack(spacing: 12) {
@@ -202,12 +200,14 @@ struct ShadowBLEPopoverView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .tint(.shadowWarning)
                 } else {
                     Button("Start Sync") {
                         syncViewModel.start()
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .tint(.shadowPrimary)
                 }
                 
                 Button("Refresh") {
@@ -215,19 +215,21 @@ struct ShadowBLEPopoverView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .tint(.shadowSuccess)
             }
         }
         .padding()
         .frame(width: 300)
+        .background(Color.shadowSurface)
     }
     
     private var statusColor: Color {
         if syncViewModel.isActive {
-            return .orange
+            return .shadowWarning
         } else if syncViewModel.stateText == "Up to Date" {
-            return .green
+            return .shadowSuccess
         } else {
-            return .gray
+            return .shadowTextTertiary
         }
     }
 }

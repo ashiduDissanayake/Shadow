@@ -32,22 +32,15 @@ struct ProfileView: View {
             GeometryReader { geometry in
                 ZStack {
                     // App gradient background
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(red: 0.05, green: 0.08, blue: 0.15),
-                            Color(red: 0.1, green: 0.15, blue: 0.25)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
+                    Color.shadowWellnessGradient()
+                        .ignoresSafeArea()
 
                     // Subtle pattern overlay
                     RoundedRectangle(cornerRadius: 0)
                         .fill(
                             RadialGradient(
                                 gradient: Gradient(colors: [
-                                    Color.white.opacity(0.02),
+                                    Color.white.opacity(0.3),
                                     Color.clear
                                 ]),
                                 center: .topTrailing,
@@ -113,14 +106,14 @@ struct ProfileView: View {
                         Text("Back")
                             .font(.system(size: 16, weight: .semibold))
                     }
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.shadowPrimary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(Color.white.opacity(0.1))
+                    .background(Color.shadowSurface)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.shadowBorder, lineWidth: 1)
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -129,7 +122,7 @@ struct ProfileView: View {
 
                 Text(isEditingMode ? "Edit Profile" : "Profile")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
 
                 Spacer()
 
@@ -150,15 +143,17 @@ struct ProfileView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(
-                        LinearGradient(
-                            colors: isEditingMode ? [.green, .green.opacity(0.8)] : [.purple, .blue],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                        Group {
+                            if isEditingMode {
+                                Color.shadowSuccess
+                            } else {
+                                Color.shadowPrimaryGradient()
+                            }
+                        }
                     )
                     .cornerRadius(12)
                     .scaleEffect(isHoveringEdit ? 1.05 : 1.0)
-                    .shadow(color: (isEditingMode ? Color.green : Color.purple ).opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: (isEditingMode ? Color.shadowSuccess : Color.shadowPrimary).opacity(0.3), radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .onHover { hovering in
@@ -173,18 +168,9 @@ struct ProfileView: View {
             // Avatar
             ZStack {
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.purple.opacity(0.8),
-                                Color.blue.opacity(0.7)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.shadowPrimaryGradient())
                     .frame(width: 120, height: 120)
-                    .shadow(color: Color.purple.opacity(0.3), radius: 25, x: 0, y: 15)
+                    .shadow(color: Color.shadowPrimary.opacity(0.3), radius: 25, x: 0, y: 15)
 
                 Text(getInitials(from: isEditingMode ? editedName : (profile.name ?? "User")))
                     .font(.system(size: 42, weight: .semibold, design: .rounded))
@@ -200,9 +186,9 @@ struct ProfileView: View {
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(.white)
                                     .frame(width: 32, height: 32)
-                                    .background(Color.purple.opacity(0.9))
+                                    .background(Color.shadowPrimary)
                                     .cornerRadius(16)
-                                    .shadow(color: .purple.opacity(0.3), radius: 8, x: 0, y: 4)
+                                    .shadow(color: Color.shadowPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
@@ -214,11 +200,11 @@ struct ProfileView: View {
                 VStack(spacing: 8) {
                     Text("Welcome back!")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.shadowTextSecondary)
 
                     Text(profile.name ?? "User")
                         .font(.system(size: 32, weight: .light, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(.shadowTextPrimary)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                 }
@@ -232,7 +218,7 @@ struct ProfileView: View {
         VStack(spacing: 24) {
             Text("Edit Your Information")
                 .font(.system(size: 24, weight: .semibold, design: .rounded))
-                .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                .foregroundColor(.shadowTextPrimary)
 
             VStack(spacing: 20) {
                 EditableField(
@@ -267,14 +253,14 @@ struct ProfileView: View {
                         Text("Cancel")
                             .font(.system(size: 16, weight: .semibold))
                     }
-                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                    .foregroundColor(.shadowTextSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color(red: 0.96, green: 0.97, blue: 0.98))
+                    .background(Color.shadowBackgroundSecondary)
                     .cornerRadius(14)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color(red: 0.9, green: 0.9, blue: 0.92), lineWidth: 1)
+                            .stroke(Color.shadowBorder, lineWidth: 1)
                     )
                     .scaleEffect(isHoveringCancel ? 1.02 : 1.0)
                 }
@@ -296,16 +282,12 @@ struct ProfileView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(
-                        LinearGradient(
-                            colors: hasChanges() ? [.green, .green.opacity(0.8)] : [.gray.opacity(0.6), .gray.opacity(0.4)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                        hasChanges() ? Color.shadowSuccess : Color.shadowTextTertiary
                     )
                     .cornerRadius(14)
                     .scaleEffect(isHoveringSave && hasChanges() ? 1.02 : 1.0)
                     .shadow(
-                        color: hasChanges() ? .green.opacity(0.3) : .clear,
+                        color: hasChanges() ? Color.shadowSuccess.opacity(0.3) : .clear,
                         radius: 8,
                         x: 0,
                         y: 4
@@ -327,35 +309,35 @@ struct ProfileView: View {
         VStack(spacing: 28) {
             Text("Profile Information")
                 .font(.system(size: 24, weight: .semibold, design: .rounded))
-                .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                .foregroundColor(.shadowTextPrimary)
 
             VStack(spacing: 16) {
                 ProfileInfoCard(
                     icon: "person.fill",
                     title: "Full Name",
                     value: profile.name ?? "Not provided",
-                    color: .purple
+                    color: .shadowPrimary
                 )
 
                 ProfileInfoCard(
                     icon: "envelope.fill",
                     title: "Email Address",
                     value: profile.email ?? "Not provided",
-                    color: .blue
+                    color: .shadowInfo
                 )
 
                 ProfileInfoCard(
                     icon: "briefcase.fill",
                     title: "Work Role",
                     value: profile.workRole ?? "Not specified",
-                    color: .green
+                    color: .shadowSuccess
                 )
 
                 ProfileInfoCard(
                     icon: "calendar",
                     title: "Member Since",
                     value: "August 2025",
-                    color: .orange
+                    color: .shadowSecondary
                 )
             }
         }
@@ -366,7 +348,7 @@ struct ProfileView: View {
         VStack(spacing: 16) {
             Text("Account Actions")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                .foregroundColor(.shadowTextPrimary)
                 .padding(.top, 16)
 
             Button(action: onLogout) {
@@ -376,14 +358,14 @@ struct ProfileView: View {
                     Text("Sign Out")
                         .font(.system(size: 16, weight: .semibold))
                 }
-                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                .foregroundColor(.shadowTextSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color(red: 0.96, green: 0.97, blue: 0.98))
+                .background(Color.shadowBackgroundSecondary)
                 .cornerRadius(14)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color(red: 0.9, green: 0.9, blue: 0.92), lineWidth: 1)
+                        .stroke(Color.shadowBorder, lineWidth: 1)
                 )
                 .scaleEffect(isHoveringLogout ? 1.02 : 1.0)
             }
@@ -403,14 +385,14 @@ struct ProfileView: View {
                     Text("Delete Account")
                         .font(.system(size: 16, weight: .semibold))
                 }
-                .foregroundColor(.red)
+                .foregroundColor(.shadowError)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.red.opacity(0.05))
+                .background(Color.shadowErrorLight)
                 .cornerRadius(14)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.red.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.shadowError.opacity(0.3), lineWidth: 1)
                 )
                 .scaleEffect(isHoveringDelete ? 1.02 : 1.0)
             }
@@ -494,26 +476,26 @@ struct EditableField: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
+                .foregroundColor(.shadowTextSecondary)
 
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                    .foregroundColor(.shadowTextSecondary)
                     .frame(width: 20)
 
                 TextField(placeholder, text: $text)
                     .textFieldStyle(PlainTextFieldStyle())
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                    .foregroundColor(.shadowTextPrimary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color(red: 0.96, green: 0.97, blue: 0.98))
+            .background(Color.shadowBackgroundSecondary)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(text.isEmpty ? Color(red: 0.9, green: 0.9, blue: 0.92) : Color.blue.opacity(0.5), lineWidth: 1)
+                    .stroke(text.isEmpty ? Color.shadowBorder : Color.shadowPrimary.opacity(0.5), lineWidth: 1)
             )
         }
     }
@@ -540,22 +522,22 @@ struct ProfileInfoCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                    .foregroundColor(.shadowTextSecondary)
 
                 Text(value)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                    .foregroundColor(.shadowTextPrimary)
             }
 
             Spacer()
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        .background(Color(red: 0.98, green: 0.99, blue: 0.99))
+        .background(Color.shadowBackgroundSecondary)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(red: 0.94, green: 0.95, blue: 0.96), lineWidth: 1)
+                .stroke(Color.shadowBorder, lineWidth: 1)
         )
     }
 }

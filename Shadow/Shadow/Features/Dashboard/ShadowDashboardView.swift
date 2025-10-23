@@ -30,14 +30,7 @@ struct ShadowDashboardView: View {
             .padding(.top, 10)
         }
         .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.05, green: 0.08, blue: 0.15),
-                    Color(red: 0.1, green: 0.15, blue: 0.25)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Color.shadowWellnessGradient()
             .ignoresSafeArea()
         )
         .sheet(isPresented: $showingDebugLog) {
@@ -69,15 +62,15 @@ struct ShadowDashboardView: View {
             HStack {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.title3)
-                    .foregroundColor(.purple)
+                    .foregroundColor(.shadowAccent)
                 Text("Stress Timeline (Last 3 Hours)")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
                 Spacer()
                 Text("\(graphEvents.count) events")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.shadowTextSecondary)
             }
             
             StressStateGraphView.chartView(for: StressStateGraphView.fromCoreData(graphEvents))
@@ -85,7 +78,11 @@ struct ShadowDashboardView: View {
                 .id(graphEvents.map { "\($0.sequenceNumber)-\($0.stressState)" }.joined())
         }
         .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.shadowSurface)
+                .shadow(color: Color.shadowElevation2, radius: 8, x: 0, y: 2)
+        )
     }
     
     // MARK: Header
@@ -95,15 +92,17 @@ struct ShadowDashboardView: View {
                 Text("Welcome back, \(profile.name ?? "User")!")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
             }
-            Text("Shadow stress monitoring dashboard")
+            Text("Your wellness companion is here to support you")
                 .font(.subheadline)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(.shadowTextSecondary)
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.shadowSurface)
+                .shadow(color: Color.shadowElevation1, radius: 6, x: 0, y: 2)
         )
     }
     
@@ -113,22 +112,22 @@ struct ShadowDashboardView: View {
             HStack {
                 Image(systemName: "brain.head.profile")
                     .font(.title2)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.shadowPrimary)
                 Text("Shadow Monitoring")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
                 Spacer()
                 statusIndicator
             }
             
             VStack(spacing: 12) {
                 statusRow("System Status", syncViewModel.stateText, systemColor: systemStatusColor)
-                statusRow("Last Sync", syncViewModel.lastSync, systemColor: .secondary)
-                statusRow("Events Received", "\(syncViewModel.eventsReceived)", systemColor: .secondary)
+                statusRow("Last Sync", syncViewModel.lastSync, systemColor: .shadowTextSecondary)
+                statusRow("Events Received", "\(syncViewModel.eventsReceived)", systemColor: .shadowTextSecondary)
                 
                 Divider()
-                    .background(Color.white.opacity(0.3))
+                    .background(Color.shadowBorder)
                 
                 // Pairing Section
                 pairingSection
@@ -137,29 +136,31 @@ struct ShadowDashboardView: View {
             HStack(spacing: 12) {
                 if syncViewModel.isActive {
                     Button("Stop") { syncViewModel.stop() }
-                        .buttonStyle(ShadowButtonStyle(color: .orange))
+                        .buttonStyle(ShadowButtonStyle(color: .shadowWarning))
                 } else {
                     Button("Start") { syncViewModel.start() }
-                        .buttonStyle(ShadowButtonStyle(color: .blue))
+                        .buttonStyle(ShadowButtonStyle(color: .shadowPrimary))
                 }
                 
                 Button("Refresh") {
                     recentEvents = syncViewModel.getRecentEvents()
                 }
-                .buttonStyle(ShadowButtonStyle(color: .green))
+                .buttonStyle(ShadowButtonStyle(color: .shadowSuccess))
                 
                 if syncViewModel.manager.isPairedToDevice {
                     Button("Forget") {
                         syncViewModel.manager.unpairDevice()
                         UserDefaults.standard.removeObject(forKey: "paired_device_id")
                     }
-                    .buttonStyle(ShadowButtonStyle(color: .red))
+                    .buttonStyle(ShadowButtonStyle(color: .shadowError))
                 }
             }
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.shadowSurface)
+                .shadow(color: Color.shadowElevation2, radius: 8, x: 0, y: 2)
         )
     }
     
@@ -169,20 +170,20 @@ struct ShadowDashboardView: View {
             HStack {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.title3)
-                    .foregroundColor(.green)
+                    .foregroundColor(.shadowSuccess)
                 Text("Recent Activity")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.shadowTextPrimary)
                 Spacer()
                 Text("\(recentEvents.count)")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.shadowTextPrimary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(.ultraThinMaterial)
+                            .fill(Color.shadowBackgroundSecondary)
                     )
             }
             
@@ -194,7 +195,9 @@ struct ShadowDashboardView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.shadowSurface)
+                .shadow(color: Color.shadowElevation2, radius: 8, x: 0, y: 2)
         )
     }
     
@@ -206,22 +209,23 @@ struct ShadowDashboardView: View {
                 .frame(width: 8, height: 8)
             Text(syncViewModel.stateText)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundColor(.shadowTextPrimary)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-            RoundedRectangle(cornerRadius: 6).fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.shadowBackgroundSecondary)
         )
     }
     
     private var systemStatusColor: Color {
         if syncViewModel.isActive {
-            return .orange
+            return .shadowWarning
         } else if syncViewModel.stateText == "Up To Date" {
-            return .green
+            return .shadowSuccess
         } else {
-            return .gray
+            return .shadowTextTertiary
         }
     }
     
@@ -229,12 +233,12 @@ struct ShadowDashboardView: View {
         HStack {
             Text(title)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(.shadowTextSecondary)
             Spacer()
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(systemColor ?? .white)
+                .foregroundColor(systemColor ?? .shadowTextPrimary)
         }
     }
     
@@ -243,22 +247,22 @@ struct ShadowDashboardView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: syncViewModel.manager.isPairedToDevice ? "checkmark.shield.fill" : "lock.shield")
-                    .foregroundColor(syncViewModel.manager.isPairedToDevice ? .green : .orange)
+                    .foregroundColor(syncViewModel.manager.isPairedToDevice ? .shadowSuccess : .shadowWarning)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Device Status")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(.shadowTextPrimary)
                     
                     if let deviceName = syncViewModel.manager.pairedDeviceName {
                         Text(deviceName)
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.shadowTextSecondary)
                     } else {
                         Text("Not paired")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.shadowTextSecondary)
                     }
                 }
                 
@@ -273,7 +277,7 @@ struct ShadowDashboardView: View {
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(syncViewModel.manager.isPairedToDevice ? Color.green : Color.orange)
+                            .fill(syncViewModel.manager.isPairedToDevice ? Color.shadowSuccess : Color.shadowWarning)
                     )
             }
             
@@ -289,7 +293,7 @@ struct ShadowDashboardView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(Color.blue)
+                    .background(Color.shadowPrimary)
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }

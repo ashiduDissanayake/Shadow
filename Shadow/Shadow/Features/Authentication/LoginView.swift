@@ -35,22 +35,15 @@ struct LoginView: View {
         GeometryReader { geometry in
             ZStack {
                 // Background with gradient
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.05, green: 0.08, blue: 0.15),
-                        Color(red: 0.1, green: 0.15, blue: 0.25)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea(.all)
+                Color.shadowWellnessGradient()
+                    .ignoresSafeArea(.all)
                 
                 // Subtle pattern overlay
                 RoundedRectangle(cornerRadius: 0)
                     .fill(
                         RadialGradient(
                             gradient: Gradient(colors: [
-                                Color.white.opacity(0.02),
+                                Color.white.opacity(0.3),
                                 Color.clear
                             ]),
                             center: .topTrailing,
@@ -68,20 +61,11 @@ struct LoginView: View {
                         // Shadow Logo
                         ZStack {
                             Circle()
-                                .fill(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.4, green: 0.2, blue: 0.8),
-                                            Color(red: 0.2, green: 0.4, blue: 0.9)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                .fill(Color.shadowPrimaryGradient())
                                 .frame(width: 80, height: 80)
-                                .shadow(color: Color(red: 0.4, green: 0.2, blue: 0.8).opacity(0.3), radius: 20, x: 0, y: 10)
+                                .shadow(color: Color.shadowPrimary.opacity(0.3), radius: 20, x: 0, y: 10)
                             
-                            Image(systemName: "figure.walk.motion")
+                            Image(systemName: "brain.head.profile")
                                 .font(.system(size: 32, weight: .light))
                                 .foregroundColor(.white)
                         }
@@ -89,20 +73,20 @@ struct LoginView: View {
                         VStack(spacing: 16) {
                             Text("Shadow")
                                 .font(.system(size: 48, weight: .ultraLight, design: .rounded))
-                                .foregroundColor(.white)
+                                .foregroundColor(.shadowTextPrimary)
                                 .tracking(2)
                             
-                            Text("Your Personal Health Guardian")
+                            Text("Your Personal Wellness Guardian")
                                 .font(.system(size: 16, weight: .light))
-                                .foregroundColor(Color.white.opacity(0.7))
+                                .foregroundColor(.shadowTextSecondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 20)
                         }
                         
                         VStack(spacing: 12) {
-                            FeaturePill(icon: "heart.fill", text: "24/7 Health Monitoring", color: .red)
-                            FeaturePill(icon: "brain.head.profile", text: "AI-Powered Insights", color: .blue)
-                            FeaturePill(icon: "shield.fill", text: "Privacy Protected", color: .green)
+                            FeaturePill(icon: "heart.fill", text: "24/7 Health Monitoring", color: .shadowSecondary)
+                            FeaturePill(icon: "brain.head.profile", text: "AI-Powered Insights", color: .shadowPrimary)
+                            FeaturePill(icon: "shield.fill", text: "Privacy Protected", color: .shadowSuccess)
                         }
                         
                         Spacer()
@@ -120,11 +104,11 @@ struct LoginView: View {
                                     VStack(spacing: 8) {
                                         Text("Welcome Back")
                                             .font(.system(size: 32, weight: .medium, design: .rounded))
-                                            .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                                            .foregroundColor(.shadowTextPrimary)
                                         
-                                        Text("Sign in to continue monitoring your health")
+                                        Text("Sign in to continue your wellness journey")
                                             .font(.system(size: 14, weight: .regular))
-                                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                                            .foregroundColor(.shadowTextSecondary)
                                             .multilineTextAlignment(.center)
                                     }
                                     .padding(.top, 40)
@@ -135,26 +119,26 @@ struct LoginView: View {
                                         VStack(alignment: .leading, spacing: 8) {
                                             Text("Email Address")
                                                 .font(.system(size: 13, weight: .medium))
-                                                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
+                                                .foregroundColor(.shadowTextSecondary)
                                             
                                             HStack(spacing: 12) {
                                                 Image(systemName: "envelope")
                                                     .font(.system(size: 16, weight: .medium))
-                                                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                                                    .foregroundColor(.shadowTextSecondary)
                                                     .frame(width: 20)
                                                 
                                                 TextField("Enter your email", text: $email)
                                                     .textFieldStyle(PlainTextFieldStyle())
                                                     .font(.system(size: 16, weight: .regular))
-                                                    .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                                                    .foregroundColor(.shadowTextPrimary)
                                             }
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 14)
-                                            .background(Color(red: 0.96, green: 0.97, blue: 0.98))
+                                            .background(Color.shadowBackgroundSecondary)
                                             .cornerRadius(12)
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(Color(red: 0.9, green: 0.9, blue: 0.92), lineWidth: 1)
+                                                    .stroke(Color.shadowBorder, lineWidth: 1)
                                             )
                                         }
                                         
@@ -162,12 +146,12 @@ struct LoginView: View {
                                         VStack(alignment: .leading, spacing: 8) {
                                             Text("Password")
                                                 .font(.system(size: 13, weight: .medium))
-                                                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
+                                                .foregroundColor(.shadowTextSecondary)
                                             
                                             HStack(spacing: 12) {
                                                 Image(systemName: "lock")
                                                     .font(.system(size: 16, weight: .medium))
-                                                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                                                    .foregroundColor(.shadowTextSecondary)
                                                     .frame(width: 20)
                                                 
                                                 Group {
@@ -179,22 +163,22 @@ struct LoginView: View {
                                                 }
                                                 .textFieldStyle(PlainTextFieldStyle())
                                                 .font(.system(size: 16, weight: .regular))
-                                                .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.2))
+                                                .foregroundColor(.shadowTextPrimary)
                                                 
                                                 Button(action: { showPassword.toggle() }) {
                                                     Image(systemName: showPassword ? "eye.slash" : "eye")
                                                         .font(.system(size: 16, weight: .medium))
-                                                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                                                        .foregroundColor(.shadowTextSecondary)
                                                 }
                                                 .buttonStyle(PlainButtonStyle())
                                             }
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 14)
-                                            .background(Color(red: 0.96, green: 0.97, blue: 0.98))
+                                            .background(Color.shadowBackgroundSecondary)
                                             .cornerRadius(12)
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(Color(red: 0.9, green: 0.9, blue: 0.92), lineWidth: 1)
+                                                    .stroke(Color.shadowBorder, lineWidth: 1)
                                             )
                                         }
                                     }
@@ -227,20 +211,11 @@ struct LoginView: View {
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 16)
-                                        .background(
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [
-                                                    Color(red: 0.4, green: 0.2, blue: 0.8),
-                                                    Color(red: 0.3, green: 0.3, blue: 0.9)
-                                                ]),
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
+                                        .background(Color.shadowPrimaryGradient())
                                         .cornerRadius(12)
                                         .scaleEffect(isHoveringLogin ? 1.02 : 1.0)
                                         .shadow(
-                                            color: Color(red: 0.4, green: 0.2, blue: 0.8).opacity(0.3),
+                                            color: Color.shadowPrimary.opacity(0.3),
                                             radius: isHoveringLogin ? 12 : 8,
                                             x: 0,
                                             y: isHoveringLogin ? 6 : 4
@@ -270,27 +245,27 @@ struct LoginView: View {
                                         HStack(spacing: 12) {
                                             Image(systemName: "touchid")
                                                 .font(.system(size: 20, weight: .medium))
-                                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.8))
+                                                .foregroundColor(.shadowPrimary)
                                             
                                             VStack(alignment: .leading, spacing: 2) {
                                                 Text("Use Touch ID")
                                                     .font(.system(size: 16, weight: .medium))
-                                                    .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
+                                                    .foregroundColor(.shadowTextPrimary)
                                                 Text("Quick and secure access")
                                                     .font(.system(size: 12, weight: .regular))
-                                                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                                                    .foregroundColor(.shadowTextSecondary)
                                             }
                                             
                                             Spacer()
                                         }
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 14)
-                                        .background(Color(red: 0.98, green: 0.98, blue: 0.99))
+                                        .background(Color.shadowBackgroundSecondary)
                                         .cornerRadius(12)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12)
                                                 .stroke(
-                                                    Color(red: 0.4, green: 0.2, blue: 0.8).opacity(0.2),
+                                                    Color.shadowPrimary.opacity(0.3),
                                                     lineWidth: isHoveringBiometric ? 2 : 1
                                                 )
                                         )
@@ -306,7 +281,7 @@ struct LoginView: View {
                                     // Footer
                                     Text("Forgot your password? Contact support")
                                         .font(.system(size: 12, weight: .regular))
-                                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                                        .foregroundColor(.shadowTextSecondary)
                                         .padding(.bottom, 40)
                                 }
                                 .padding(.horizontal, 40)
