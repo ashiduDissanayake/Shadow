@@ -19,10 +19,12 @@ class NotificationDecisionEngine: ObservableObject {
     private var stressStartTime: Date?
     private var lastNotificationTime: Date?
     private var lastNotifiedState: Int16?
+    private var stressMonitorTimer: Timer?
     
     // Configuration
-    private let stressDurationThreshold: TimeInterval = 30   // 30 seconds for testing (production: 600)
-    private let notificationCooldown: TimeInterval = 30      // 30 seconds for testing (production: 300)
+    private let stressDurationThreshold: TimeInterval = 600  // 10 minutes (600 seconds)
+    private let notificationCooldown: TimeInterval = 5       // 5 seconds - allow instant calm notifications
+    private let monitorInterval: TimeInterval = 30          // Check every 30 seconds
 
     // MARK: - Decision Logic
     
@@ -166,6 +168,7 @@ class NotificationDecisionEngine: ObservableObject {
             if stressStartTime == nil {
                 stressStartTime = Date()
                 print("🔔 [NotificationEngine] ⏱️ Stress period started at \(Date())")
+                startMonitoringTimer()
             } else {
                 let duration = Date().timeIntervalSince(stressStartTime!)
                 print("🔔 [NotificationEngine] ⏱️ Stress ongoing for \(Int(duration/60)) minutes")
@@ -175,26 +178,12 @@ class NotificationDecisionEngine: ObservableObject {
                 let duration = Date().timeIntervalSince(stressStartTime!)
                 print("🔔 [NotificationEngine] ✅ Stress period ended after \(Int(duration/60)) minutes")
                 stressStartTime = nil
+                stopMonitoringTimer()
             }
         }
         
         // PATTERN 1: Prolonged Stress (10+ minutes) → Suggest break
-        if currentState == 1, let startTime = stressStartTime {
-            let duration = Date().timeIntervalSince(startTime)
-            print("🔔 [NotificationEngine] Checking threshold: \(Int(duration))s / \(Int(stressDurationThreshold))s")
-            
-            if duration >= stressDurationThreshold {
-                print("🔔 [NotificationEngine] ⚠️ THRESHOLD REACHED!")
-                // Check cooldown to avoid spam
-                if shouldSendNotification() {
-                    print("🔔 [NotificationEngine] ✅ Cooldown OK - Sending prolonged stress notification")
-                    sendProlongedStressNotification(event: event)
-                    return
-                } else {
-                    print("🔔 [NotificationEngine] ⏸️ Cooldown active - Skipping notification")
-                }
-            }
-        }
+        checkProlongedStress(currentState: currentState, event: event)
         
         // PATTERN 2: State Transitions (stressed → calm)
         if let lastState = lastNotifiedState {
@@ -204,6 +193,7 @@ class NotificationDecisionEngine: ObservableObject {
                     if shouldSendNotification() {
                         print("🔔 [NotificationEngine] ✅ Cooldown OK - Sending recovery notification")
                         sendRecoveryNotification(event: event)
+                        lastNotifiedState = currentState  // ← FIX: Update state after sending
                     } else {
                         print("🔔 [NotificationEngine] ⏸️ Cooldown active - Skipping recovery notification")
                     }
@@ -215,6 +205,52 @@ class NotificationDecisionEngine: ObservableObject {
         }
         
         print("🔔 [NotificationEngine] ========================================")
+    }
+    
+    // MARK: - Stress Monitoring
+    
+    private func startMonitoringTimer() {
+        guard stressMonitorTimer == nil else {
+            print("⏰ [NotificationEngine] Timer already running")
+            return
+        }
+        
+        print("⏰ [NotificationEngine] Starting monitor (every \(Int(monitorInterval))s)")
+        stressMonitorTimer = Timer.scheduledTimer(withTimeInterval: monitorInterval, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                print("⏰ [NotificationEngine] Timer tick - checking threshold")
+                self.checkProlongedStress(currentState: 1, event: nil)
+            }
+        }
+    }
+    
+    private func stopMonitoringTimer() {
+        stressMonitorTimer?.invalidate()
+        stressMonitorTimer = nil
+        print("⏰ [NotificationEngine] Timer stopped")
+    }
+    
+    private func checkProlongedStress(currentState: Int16, event: StressEvent?) {
+        guard currentState == 1, let startTime = stressStartTime else { return }
+        
+        let duration = Date().timeIntervalSince(startTime)
+        print("🔔 [NotificationEngine] Checking threshold: \(Int(duration))s / \(Int(stressDurationThreshold))s")
+        
+        if duration >= stressDurationThreshold {
+            print("🔔 [NotificationEngine] ⚠️ THRESHOLD REACHED!")
+            if shouldSendNotification() {
+                print("🔔 [NotificationEngine] ✅ Cooldown OK - Sending prolonged stress notification")
+                if let event = event {
+                    sendProlongedStressNotification(event: event)
+                } else {
+                    sendProlongedStressNotificationWithoutEvent()
+                }
+                lastNotifiedState = currentState
+            } else {
+                print("🔔 [NotificationEngine] ⏸️ Cooldown active - Skipping")
+            }
+        }
     }
     
     /// Check upcoming calendar events with stress-aware logic
@@ -270,6 +306,32 @@ class NotificationDecisionEngine: ObservableObject {
             
             lastNotificationTime = Date()
             print("✅ [NotificationEngine] Prolonged stress notification sent!")
+        }
+    }
+    
+    private func sendProlongedStressNotificationWithoutEvent() {
+        Task {
+            print("🤖 [NotificationEngine] Calling AI for timer-triggered prolonged stress message...")
+            
+            // Create a temporary StressEvent for AI context
+            let context = PersistenceController.shared.container.viewContext
+            let tempEvent = StressEvent(context: context)
+            tempEvent.stressState = 1
+            tempEvent.timestamp = Date()
+            
+            let body = await AIDecisionProvider.shared.message(for: tempEvent)
+            print("🤖 [NotificationEngine] AI generated: '\(body)'")
+            
+            let content = UNMutableNotificationContent()
+            content.title = ""
+            content.body = body
+            content.sound = .default
+            
+            let req = UNNotificationRequest(identifier: "stress-prolonged-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+            try? await UNUserNotificationCenter.current().add(req)
+            
+            lastNotificationTime = Date()
+            print("✅ [NotificationEngine] Timer-triggered prolonged stress notification sent!")
         }
     }
     
